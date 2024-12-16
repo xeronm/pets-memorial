@@ -3,25 +3,32 @@ import "./messages.tact";
 import "./exceptions.tact";
 
 struct AuthItemInfo {
-    collectionAddress: Address;
-    ownerAddress: Address;
+    collection_address: Address;
+    owner_address: Address;
     index: Int;
     isClassB: Bool;
     balanceWithdrawn: Int;
     balance: Int;
 }
 
+struct WithdrawResult {
+    value: Int;
+}
+
 contract AuthItem {
-    collectionAddress: Address;
+    override const storageReserve: Int = ton("0.05");
+
+    collection_address: Address;
     index: Int as uint4; 
     isClassB: Bool;
     balanceWithdrawn: Int as coins;
-    owner: Address?;
+    owner: Address;
 
-    init(collectionAddress: Address, index: Int, isClassB: Bool) {
-        require(sender() == collectionAddress, ErrorNotAuthorized);
+    init(collection_address: Address, index: Int, isClassB: Bool) {
+        require(sender() == collection_address, ErrorNotAuthorized);
 
-        self.collectionAddress = collectionAddress;
+        self.collection_address = collection_address;
+        self.owner = collection_address;
         self.index = index;
         self.isClassB = isClassB;
         self.balanceWithdrawn = 0;
@@ -30,28 +37,63 @@ contract AuthItem {
     receive() {
     }
 
-    receive(msg: AuthItemTransfer){
+    receive("withdraw") {
         let ctx: Context = context();
-        
-        if (self.owner == null) {  // Not initialized
-            require(ctx.sender == self.collectionAddress, ErrorNotAuthorized);
-            self.balanceWithdrawn = msg.initBalanceWithdrawn;
-        } else {
-            require(ctx.sender == self.owner, ErrorNotAuthorized);
-        }
+        require(ctx.sender == self.owner, ErrorNotAuthorized);
+        send(SendParameters{
+            to: self.collection_address,
+            bounce: false,
+            value: 0,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: Withdraw{
+                queryId: self.balanceWithdrawn,
+                index: self.index,
+                isClassB: self.isClassB,
+                balanceWithdrawn: self.balanceWithdrawn,
+            }.toCell()
+        });
+    }
 
+    receive(msg: WithdrawReply) {
+        require(self.notInitialized() || (self.balanceWithdrawn <= msg.balanceWithdrawn), ErrorAssertion);
+        let value: Int = msg.balanceWithdrawn - self.balanceWithdrawn;
+        self.balanceWithdrawn = msg.balanceWithdrawn;
+
+        nativeReserve(self.storageReserve, 0);
+        send(SendParameters{
+            to: self.owner,
+            bounce: true,
+            value: 0,
+            mode: SendRemainingBalance + SendIgnoreErrors,
+            body: WithdrawResult{value: value}.toCell(),
+        });
+
+        // emit(LogEventWithdrawResult{value: value}.toCell());
+    }
+
+    receive(msg: AuthItemTransfer){
+        let ctx: Context = context();        
+        require(ctx.sender == self.owner, ErrorNotAuthorized);
+        if (self.notInitialized()) {
+            self.balanceWithdrawn = msg.balanceWithdrawn;
+        }
         self.owner = msg.newOwner;
     }
 
     get fun info(): AuthItemInfo {
         let balance: Int = myBalance();
         return AuthItemInfo{
-            collectionAddress: self.collectionAddress,
-            ownerAddress: self.owner!!,
+            collection_address: self.collection_address,
+            owner_address: self.owner,
             index: self.index,
             isClassB: self.isClassB,
             balanceWithdrawn: self.balanceWithdrawn,
             balance: balance           
         }
-    }    
+    }
+
+    // private methods
+    fun notInitialized(): Bool {
+        return (self.owner == self.collection_address);
+    }
 }
