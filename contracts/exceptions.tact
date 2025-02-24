@@ -1,5 +1,12 @@
 const ErrorAssertion: String = "Internal Error!";
+const ErrorValidation: String = "Validation error";
+const ErrorInsufficientFunds: String = "Insufficient funds for operation";
 const ErrorCompareState: String = "CAS: previous state mistmatch";
 const ErrorMaxAuthItemCount: String = "Maximum AuthItem count reached";
 const ErrorMinimumStorageFee: String = "storageFee: minimum value constraint violated";
 const ErrorNotAuthorized: String = "Not authorized";
+const ErrorVoteInProgress: String = "Vote already in progress";
+const ErrorVoteDuplicated: String = "Vote duplicated";
+const ErrorVoteInvalidState: String = "Vote has invalid state";
+const ErrorVoteExpired: String = "Vote expired";
+const ErrorPendingTransaction: String = "Pending Transaction";

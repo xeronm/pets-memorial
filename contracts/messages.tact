@@ -1,10 +1,96 @@
-// PetsCollection Producer
-message UpdateSettings {
+const CollectionDeployMinTons: Int = ton("0.115");  // 2x0.05[storageReserve] + 0.015[GasFees]
+const TransferAuthItemMinTons: Int = ton("0.1");
+
+const MinFeeStorage: Int = 0x38; // 0.01 TON
+
+const VoteStatusError: Int = 0;
+const VoteStatusPending: Int = 1;
+const VoteStatusExecuted: Int = 2;
+const VoteStatusAborted: Int = 3;
+
+// Vote-required Messages: Wallet -> AuthItem -> PetCollection
+const VoteOpMintAuthItem: Int = 0x3ef428b9;
+const VoteOpUpdateSettings: Int = 0x4219f222;
+const VoteOpTransferAuthItem: Int = 0x9d9f8663;
+
+struct PetMemoryNftImmutableData {
+    species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3... - reserved;
+    name: String;
+    sex: Int as uint1; // 0 - male, 1 - female
+    speciesName: String?;    
+    breed: String?;
+    countryCode: Int as uint10; // 10 bytes ISO 3166-1 numeric-3 code, e.g. 643; 0 - means unspecified or unknown
+    location: String?; // It's preferred to use Postal Code
+    birthDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0 - means unspecified or unknown
+    deathDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0 - means unspecified or unknown
+}
+
+struct PetMemoryNftData {
+    uri: String?;
+    description: String?; // Memo
+    image: String?;
+    imageData: Cell?;
+}
+
+struct PetMemoryNftContent {
+    immData: PetMemoryNftImmutableData;
+    data: PetMemoryNftData;
+}
+
+struct PetMemoryNftInit {
+    data: PetMemoryNftData;
+    storageReserve: Int as uint8;
+}
+
+struct MintAuthItemItem {
+    owner: Address;
+    isClassB: Bool;    
+}
+
+struct TransferAuthItemItem {
+    address: Address;
+    newOwner: Address;
+}
+
+message Excesses {
     queryId: Int as uint64;
-    state_id: Int as uint32;
+}
+
+message(0x3ef428b9) MintAuthItems {
+    items: map<Int as uint4, MintAuthItemItem>;
+}
+
+message(0x4219f222) UpdateSettings {
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;  
+}
+
+message(0x9d9f8663) TransferAuthItems {
+    items: map<Int as uint4, TransferAuthItemItem>;
+}
+
+
+// PetsCollection Interface
+message PutToVote {
+    queryId: Int as uint64;
+    index: Int as uint4;
+    isClassB: Bool;
+    message: Cell;
+}
+
+message Vote {
+    queryId: Int as uint64;
+    stateId: Int as uint32;
+    index: Int as uint4;
+    isClassB: Bool;
+    vote: Bool;
+}
+
+message VoteReply {
+    queryId: Int as uint64;
+    stateId: Int as uint32;
+    status: Int as uint2;
 }
 
 message QueryAuthItemAddress {
@@ -22,39 +108,90 @@ message Withdraw {
 message WithdrawReply {
     queryId: Int as uint64;    
     balanceWithdrawn: Int as coins;
-}
-
-struct PetMemoryNftImmutableMetaData {
-    species: Int as uint8; // 0 - Other, 1 - Dog, 2 - Cat, ...;
-    isMale: Bool;
-    name: String;
-    breed: String;
-    location: String; // It's preferred to use Postal Code
-    owners: String;
-    birthDate: Int as uint32; // Days since the epoch - January 1, 1970, UTC
-    deathDate: Int as uint32; // Days since the epoch - January 1, 1970, UTC
+    storageReserve: Int as uint8;
 }
 
 message MintPetMemoryNft {
     queryId: Int as uint64;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
-    meta: PetMemoryNftImmutableMetaData;
-    // Mutable attributes
-    memo: String;
-    image: String;
-    imageData: Cell;
+    newOwner: Address?;
+    content: PetMemoryNftContent;
 }
 
-// AuthItem Producer
-message AuthItemTransfer {
+message VoteExecuteResult {
+    executor: Address;
+    voteAction: VoteAction;
+    aborted: Bool;
+}
+
+// AuthItem Interface
+message AuthItemWithdraw {
     queryId: Int as uint64;
+}
+
+message AuthItemWithdrawResult {
+    queryId: Int as uint64;
+    value: Int;
+}
+
+message AuthItemVote {
+    queryId: Int as uint64;
+    stateId: Int as uint32;
+    vote: Bool;    
+}
+
+message AuthItemVoteReply {
+    queryId: Int as uint64;
+    status: Int as uint2;
+}
+
+message AuthItemPutToVote {
+    queryId: Int as uint64;
+    message: Cell;
+}
+
+message AuthItemTransfer {
     newOwner: Address;
     balanceWithdrawn: Int as coins;
 }
 
-// MemoryNft Producer
-message PetMemoryNftTransfer {
+// PetMemoryNft Producer
+message PetMemoryNftUpdate {
     queryId: Int as uint64;
-    newOwner: Address;    
+    data: PetMemoryNftData;
+}
+
+// NFT Item Interface
+message(0x5fcc3d14) Transfer {
+    queryId: Int as uint64;
+    newOwner: Address;
+    responseDestination: Address?;
+    customPayload: Cell?;
+    forwardAmount: Int as coins;
+    forwardPayload: Slice as remaining;
+}
+
+message(0x05138d91) OwnershipAssigned {
+    queryId: Int as uint64;
+    prevOwner: Address;
+    forwardPayload: Slice as remaining;
+}
+
+message(0x2fcb26a2) GetStaticData {
+    queryId: Int as uint64;
+}
+
+message(0x8b771735) ReportStaticData {
+    queryId: Int as uint64;
+    indexId: Int;
+    collection: Address;
+}
+
+struct GetNftData {
+    isInitialized: Bool;
+    index: Int;
+    collectionAddress: Address;
+    ownerAddress: Address;
+    individualContent: Cell;
 }

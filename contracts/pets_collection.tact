@@ -3,15 +3,23 @@ import "./imports/utils.fc";
 import "./messages.tact";
 import "./exceptions.tact";
 import "./auth_item.tact";
+import "./pet_memory_nft.tact";
+import "./utils.tact";
 
-// Mapping function signatures from FunC to Tact:
-@name(unpack_qint)
-native unpackQint(qnum: Int): Int;
+struct VoteAction {
+    requester: Address;
+    stateId: Int as uint32;
+    dateCreated: Int as uint64;    
+    message: Cell;
+}
 
 struct Info {
-    countryCode: Int as uint10;
-    partId: Int as uint6;
-    state_id: Int as uint32;
+    voteAction: VoteAction?;
+    votesFor: Int as uint4;
+    votesAgainst: Int as uint4;
+    classACount: Int as uint4;
+    classBCount: Int as uint4;
+    voteDurationHours: Int as uint8;
     //
     feeStorageTons: Int as coins;
     feeClassATons: Int as coins;
@@ -23,42 +31,45 @@ struct Info {
 }
 
 fun nextState(): Int {
-    nativeRandomizeLt();
     return randomInt() & 0xFFFFFFFF;
 }
 
-const MinFeeStorage: Int = 0x30; // 0.001 TON
 const MaxAuthItemIndex: Int = 15;
+const MinVoteDurationMinutes: Int = 1440;
 
 contract PetsCollection {
-    override const storageReserve: Int = ton("0.05");
+    override const storageReserve: Int = ton("0.05");  // CollectionStorageReserve;
 
-    // Immutable Attributes
-    countryCode: Int as uint10; // 10 bytes ISO 3166-1 numeric-3 code
-    partId: Int as uint6; // For sharding purpose, 0 - default
-    //
+    // Mutable Internal Attributes
+    // - Minting data
     authIndexSeq: Int as uint4;
+    nftIndexSeq: Int;
     classBCount: Int as uint4;
     classACount: Int as uint4;
-    state_id: Int as uint32;
-    // Fee Settings
+    // - Balances
+    balanceWithdrawn: Int as coins;
+    balanceClassB: Int as coins;
+    // - Current Vote action
+    voteAction: VoteAction?;
+    votesFor: Int as uint4;
+    votesAgainst: Int as uint4;
+    // Mutable Settings
+    // - Fees
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;    
-    // Balances
-    balanceWithdrawn: Int as coins;
-    balanceClassB: Int as coins;
+    // - Vote settings
+    voteDurationHours: Int as uint8;
 
-
-    init(countryCode: Int, partId: Int) {
-        // Immutable Data
-        self.countryCode = countryCode;
-        self.partId = partId;
+    init() {
+        //
+        self.votesFor = 0;
+        self.votesAgainst = 0;
         //
         self.authIndexSeq = 1;
+        self.nftIndexSeq = 1;
         self.classBCount = 0;
         self.classACount = 0;
-        self.state_id = nextState();
         // 
         self.feeStorage = 0x3C;  // 0.05 TON
         self.feeClassA = 0x3A; // 0.025 TON
@@ -66,46 +77,125 @@ contract PetsCollection {
         // 
         self.balanceWithdrawn = 0;
         self.balanceClassB = 0;
+        //
+        self.voteDurationHours = 24;
     }
 
     receive() {        
     }
 
     receive(msg: Deploy) {
-        let ctx: Context = context();        
-        let mintValue: Int = unpackQint(self.feeStorage);
+        require(context().value >= CollectionDeployMinTons, ErrorInsufficientFunds);
         // deploy first AuthItem
-        self.mintAuthItem(ctx.sender, mintValue, false);
+        self.mintAuthItem(sender(), false, unpackQint(self.feeStorage));
         // send rest amount back
         self.notify(DeployOk{queryId: msg.queryId}.toCell());
     }
 
-    receive(msg: UpdateSettings) {
-        require(msg.state_id == self.state_id, ErrorCompareState);
-        require(msg.feeStorage >= MinFeeStorage, ErrorMinimumStorageFee);
+    receive(msg: MintPetMemoryNft) {
+        let storageReserve: Int = unpackQint(self.feeStorage);
+        let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
+        let feeClassB: Int = unpackQint(max(msg.feeClassB, self.feeClassB)); 
         let ctx = context();
+        let fwdFee: Int = ctx.readForwardFee();
 
-        self.feeStorage = msg.feeStorage;
-        self.feeClassA = msg.feeClassA;
-        self.feeClassB = msg.feeClassB;
-        self.state_id = nextState();
+        require(ctx.value >= storageReserve + feeClassA + feeClassB + 2*fwdFee, ErrorInsufficientFunds);
+
+        let nftInit: StateInit = initOf PetMemoryNft(myAddress(), self.nftIndexSeq, msg.content.immData);
+        let nftAddress: Address = contractAddress(nftInit);
+
+        send(SendParameters{
+            to: nftAddress, 
+            value: ctx.value - (feeClassA + feeClassB + fwdFee), 
+            bounce: true,
+            mode: 0,
+            body: Transfer{
+                queryId: msg.queryId,
+                newOwner: (msg.newOwner == null) ? sender() : msg.newOwner!!,
+                responseDestination: sender(),
+                forwardAmount: 0,
+                forwardPayload: emptySlice(),
+                customPayload: PetMemoryNftInit{
+                    data: msg.content.data,
+                    storageReserve: self.feeStorage,
+                }.toCell(),
+            }.toCell(),
+            code: nftInit.code,
+            data: nftInit.data
+        });
+
+        self.nftIndexSeq += 1;
+        self.balanceClassB += feeClassB;
+    }
+
+    receive(msg: PutToVote) {
+        self.assertAuthItem(msg.index, msg.isClassB);
+        require(self.voteAction == null, ErrorVoteInProgress);
+
+        nativeRandomizeLt();
+        let stateId: Int = randomUint32();
+        self.voteAction = VoteAction{
+            stateId: stateId,
+            requester: sender(),
+            dateCreated: now(),
+            message: msg.message,
+        };
+        self.votesFor = 1;
+        self.votesAgainst = 0;
+
+        if (self.classACount == 1) {
+            self.voteExecute();
+        }
+
+        self.notify(VoteReply{
+            queryId: msg.queryId, 
+            stateId: stateId,
+            status: ((self.voteAction == null) ? VoteStatusExecuted : VoteStatusPending)
+        }.toCell());
+    }
+
+    receive(msg: Vote) {
+        require(msg.isClassB == false, ErrorNotAuthorized);
+        self.assertAuthItem(msg.index, msg.isClassB);
+        if (self.voteAction == null) {
+            require(false, ErrorVoteInvalidState);
+        }
+        let vote: VoteAction = self.voteAction!!;
+        require(vote.stateId == msg.stateId, ErrorVoteInvalidState);        
+        require(now() <= vote.dateCreated + self.voteDurationHours*60, ErrorVoteExpired);
+
+        if (msg.vote) {
+            self.votesFor += 1;
+        }
+        else {
+            self.votesAgainst += 1;
+        }
+        
+        if (self.votesFor > (self.classACount >> 1)) {  // 50% + 1
+            self.voteExecute();
+        }
+
+        self.notify(VoteReply{
+            queryId: msg.queryId, 
+            stateId: msg.stateId,
+            status: ((self.voteAction == null) ? VoteStatusExecuted : VoteStatusPending),
+        }.toCell());
     }
 
     receive(msg: Withdraw) {
-        let authItemAddr: Address = self.calcAuthItemAddress(msg.index, msg.isClassB);
-        let ctx: Context = context();
-        require(ctx.sender == authItemAddr, ErrorNotAuthorized);
+        self.assertAuthItem(msg.index, msg.isClassB);
 
-        let msgAmount: Int = self.calcAvailableForWithdraw(msg.isClassB, myBalance() - ctx.value, msg.balanceWithdrawn);
+        let msgAmount: Int = self.calcAvailableForWithdraw(msg.isClassB, myBalance() - context().value, msg.balanceWithdrawn);
         self.balanceWithdrawn += msgAmount;
         send(SendParameters{
             to: sender(),
-            bounce: true,
+            bounce: false,
             value: msgAmount,
             mode: SendRemainingValue + SendIgnoreErrors,
             body: WithdrawReply{
                 queryId: msg.queryId,
                 balanceWithdrawn: self.balanceWithdrawn,
+                storageReserve: self.feeStorage - 1,
             }.toCell()
         });
     }
@@ -113,9 +203,13 @@ contract PetsCollection {
     get fun info(): Info {
         let balance: Int = myBalance();
         return Info{
-            countryCode: self.countryCode,
-            partId: self.partId,
-            state_id: self.state_id,
+            voteAction: self.voteAction,
+            votesFor: self.votesFor,
+            votesAgainst: self.votesAgainst,
+            classACount: self.classACount,
+            classBCount: self.classBCount,
+            //
+            voteDurationHours: self.voteDurationHours,
             //
             feeStorageTons: unpackQint(self.feeStorage),
             feeClassATons: unpackQint(self.feeClassA),
@@ -132,6 +226,14 @@ contract PetsCollection {
     }
     
     // Private Methods
+    fun assertFromMySelf() {
+        require(sender() == myAddress(), ErrorNotAuthorized);
+    }
+
+    fun assertAuthItem(index: Int, isClassB: Bool) {
+        require(sender() == self.calcAuthItemAddress(index, isClassB), ErrorNotAuthorized);
+    }
+
     fun authItemInit(index: Int, isClassB: Bool): StateInit {
         return initOf AuthItem(myAddress(), index, isClassB);
     }
@@ -142,11 +244,16 @@ contract PetsCollection {
         return contractAddress(nft_init);
     }
 
-    fun calcAvailableForWithdraw(isClassB: Bool, balance: Int, withdrawnBalance: Int): Int {
+    fun availableBalance(isClassB: Bool, balance: Int): Int {
         let amount: Int = (isClassB ? self.balanceClassB : (self.balanceWithdrawn + balance - self.balanceClassB));
         if (amount > balance - self.storageReserve) {
             amount = balance - self.storageReserve;
         }
+        return amount;
+    }
+
+    fun calcAvailableForWithdraw(isClassB: Bool, balance: Int, withdrawnBalance: Int): Int {
+        let amount: Int = self.availableBalance(isClassB, balance);
         let shares = (isClassB ? self.classBCount : self.classACount);
         if (shares == 0) {
             return 0;
@@ -160,36 +267,93 @@ contract PetsCollection {
         return amount;
     }
 
-    fun mintAuthItem(itemOwner: Address, msgValue: Int, isClassB: Bool) {
+    fun mintAuthItem(itemOwner: Address, isClassB: Bool, value: Int) {
         require(self.authIndexSeq <= MaxAuthItemIndex, ErrorMaxAuthItemCount);
-        let nft_init: StateInit = self.authItemInit(self.authIndexSeq, isClassB);
+        let nftInit: StateInit = self.authItemInit(self.authIndexSeq, isClassB);
         send(SendParameters{
-                to: contractAddress(nft_init), 
-                value: msgValue, 
+                to: contractAddress(nftInit), 
+                value: unpackQint(self.feeStorage), 
                 bounce: false,
                 mode: SendIgnoreErrors,
                 body: AuthItemTransfer{
-                    queryId: 0,
                     newOwner: itemOwner,
                     balanceWithdrawn: self.balanceWithdrawn,
                 }.toCell(),
-                code: nft_init.code,
-                data: nft_init.data
+                code: nftInit.code,
+                data: nftInit.data
             });
-        self.authIndexSeq = self.authIndexSeq + 1;
+        self.authIndexSeq += 1;
+
         if (isClassB) {
-            self.classBCount += 1;    
+            self.classBCount += 1;
         }
         else {
-            self.classACount += 1;    
+            self.classACount += 1;
+        }          
+    }
+
+    fun voteExecute() {
+        let op: Int = self.voteAction!!.message.asSlice().preloadUint(32);
+        if (op == VoteOpUpdateSettings) {
+            self.execUpdateSettings(UpdateSettings.fromCell(self.voteAction!!.message));
         }
+        else if (op == VoteOpMintAuthItem) {
+            self.execMintAuthItem(MintAuthItems.fromCell(self.voteAction!!.message))
+        }
+        else if (op == VoteOpTransferAuthItem) {            
+            self.execTransferAuthItem(TransferAuthItems.fromCell(self.voteAction!!.message))
+        }
+
+        self.voteAction = null;
+        self.votesFor = 0;
+        self.votesAgainst = 0;
     }
 
-    fun remainingValue(value: Int): Int {
-        return value -  myStorageDue();
+    fun execUpdateSettings(msg: UpdateSettings) {
+        require(msg.feeStorage >= MinFeeStorage, ErrorMinimumStorageFee);
+        self.feeStorage = msg.feeStorage;
+        self.feeClassA = msg.feeClassA;
+        self.feeClassB = msg.feeClassB;
     }
 
+    fun execMintAuthItem(msg: MintAuthItems) {
+        let count: Int = 0;
+        foreach (id, item in msg.items) {
+            count += 1;
+        }
+        require(self.authIndexSeq + count <= MaxAuthItemIndex, ErrorMaxAuthItemCount);
 
+        let itemValue: Int = unpackQint(self.feeStorage);
+        let balance: Int = self.availableBalance(false, myBalance() - context().value);
+        require(balance > itemValue * count, ErrorInsufficientFunds);
+
+        foreach (id, item in msg.items) {
+            self.mintAuthItem(item.owner, item.isClassB, itemValue);
+        }    
+    }
+
+    fun execTransferAuthItem(msg: TransferAuthItems) {
+        let count: Int = 0;
+        foreach (id, item in msg.items) {
+            count += 1;
+        }
+
+        let balance: Int = self.availableBalance(false, myBalance() - context().value);        
+        require(balance > TransferAuthItemMinTons * count, ErrorInsufficientFunds);
+
+        foreach (id, item in msg.items) {
+            send(SendParameters{
+                to: item.address,
+                bounce: false,
+                value: 0,
+                mode: SendPayGasSeparately + SendIgnoreErrors,
+                body: AuthItemTransfer{
+                    newOwner: item.newOwner,
+                    balanceWithdrawn: self.balanceWithdrawn,
+                }.toCell(),
+            });
+        }        
+    }
 }
 
 

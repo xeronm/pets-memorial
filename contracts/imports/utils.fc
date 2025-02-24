@@ -37,3 +37,11 @@
     num = num ? num : 8;
     return (num * power(10, qnum >> 3)) >> 3;
 }
+
+(int) random_uint64() {
+    return random() & 0xFFFFFFFFFFFFFFFF;
+}
+
+(int) random_uint32() {
+    return random() & 0xFFFFFFFF;
+}

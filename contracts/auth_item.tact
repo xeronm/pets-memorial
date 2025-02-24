@@ -1,34 +1,31 @@
 import "@stdlib/deploy";
 import "./messages.tact";
 import "./exceptions.tact";
+import "./utils.tact";
 
 struct AuthItemInfo {
-    collection_address: Address;
-    owner_address: Address;
+    collectionAddress: Address;
+    ownerAddress: Address;
     index: Int;
     isClassB: Bool;
     balanceWithdrawn: Int;
     balance: Int;
-}
-
-struct WithdrawResult {
-    value: Int;
+    voteStateId: Int? as uint32;
 }
 
 contract AuthItem {
-    override const storageReserve: Int = ton("0.05");
-
-    collection_address: Address;
+    collectionAddress: Address;
     index: Int as uint4; 
     isClassB: Bool;
     balanceWithdrawn: Int as coins;
     owner: Address;
+    voteStateId: Int? as uint32;
+    isPendingTx: Bool?;
 
-    init(collection_address: Address, index: Int, isClassB: Bool) {
-        require(sender() == collection_address, ErrorNotAuthorized);
-
-        self.collection_address = collection_address;
-        self.owner = collection_address;
+    init(collectionAddress: Address, index: Int, isClassB: Bool) {
+        require(sender() == collectionAddress, ErrorNotAuthorized);
+        self.collectionAddress = collectionAddress;
+        self.owner = collectionAddress;
         self.index = index;
         self.isClassB = isClassB;
         self.balanceWithdrawn = 0;
@@ -37,16 +34,73 @@ contract AuthItem {
     receive() {
     }
 
-    receive("withdraw") {
-        let ctx: Context = context();
-        require(ctx.sender == self.owner, ErrorNotAuthorized);
+    receive(msg: AuthItemPutToVote) {
+        require(self.isClassB == false, ErrorNotAuthorized);
+        self.assertOwnerMethod();
+
+        self.isPendingTx = true;
         send(SendParameters{
-            to: self.collection_address,
-            bounce: false,
+            to: self.collectionAddress,
+            bounce: true,
+            value: 0,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: PutToVote{
+                queryId: msg.queryId,
+                index: self.index,
+                isClassB: self.isClassB,
+                message: msg.message,
+            }.toCell()
+        });        
+    }
+
+    bounced(msg: bounced<PutToVote>) {
+        self.isPendingTx = null;
+        self.voteReply(msg.queryId, VoteStatusError);
+    }
+
+    receive(msg: AuthItemVote) {
+        self.assertOwnerMethod();
+        require(self.isPendingTx == null, ErrorPendingTransaction);
+        require(self.voteStateId != msg.stateId, ErrorVoteDuplicated);
+
+        self.isPendingTx = true;
+        send(SendParameters{
+            to: self.collectionAddress,
+            bounce: true,
+            value: 0,
+            mode: SendRemainingValue + SendIgnoreErrors,
+            body: Vote{
+                queryId: msg.queryId,
+                stateId: msg.stateId,
+                index: self.index,
+                isClassB: self.isClassB,
+                vote: msg.vote
+            }.toCell()
+        });        
+    }
+
+    bounced(msg: Vote) {
+        self.isPendingTx = null;
+        self.voteReply(msg.queryId, VoteStatusError);
+    }
+
+    receive(msg: VoteReply) {
+        self.assertCollectionMethod();
+        self.voteStateId = msg.stateId;
+        self.isPendingTx = null;
+        self.voteReply(msg.queryId, msg.status);
+    }    
+
+    receive(msg: AuthItemWithdraw) {
+        // require(context().value >= WithdrawMinTons, ErrorInsufficientFunds);
+        self.assertOwnerMethod();
+        send(SendParameters{
+            to: self.collectionAddress,
+            bounce: true,
             value: 0,
             mode: SendRemainingValue + SendIgnoreErrors,
             body: Withdraw{
-                queryId: self.balanceWithdrawn,
+                queryId: msg.queryId,
                 index: self.index,
                 isClassB: self.isClassB,
                 balanceWithdrawn: self.balanceWithdrawn,
@@ -55,26 +109,28 @@ contract AuthItem {
     }
 
     receive(msg: WithdrawReply) {
+        self.assertCollectionMethod();
         require(self.notInitialized() || (self.balanceWithdrawn <= msg.balanceWithdrawn), ErrorAssertion);
         let value: Int = msg.balanceWithdrawn - self.balanceWithdrawn;
         self.balanceWithdrawn = msg.balanceWithdrawn;
 
-        nativeReserve(self.storageReserve, 0);
+        nativeReserve(unpackQint(msg.storageReserve), 0);
         send(SendParameters{
             to: self.owner,
             bounce: true,
             value: 0,
-            mode: SendRemainingBalance + SendIgnoreErrors,
-            body: WithdrawResult{value: value}.toCell(),
+            mode: SendRemainingBalance,
+            body: AuthItemWithdrawResult{
+                queryId: msg.queryId,
+                value: value
+            }.toCell(),
         });
-
-        // emit(LogEventWithdrawResult{value: value}.toCell());
     }
 
     receive(msg: AuthItemTransfer){
-        let ctx: Context = context();        
-        require(ctx.sender == self.owner, ErrorNotAuthorized);
-        if (self.notInitialized()) {
+        self.assertCollectionMethod();
+        let initState = self.notInitialized();
+        if (initState) {
             self.balanceWithdrawn = msg.balanceWithdrawn;
         }
         self.owner = msg.newOwner;
@@ -83,17 +139,40 @@ contract AuthItem {
     get fun info(): AuthItemInfo {
         let balance: Int = myBalance();
         return AuthItemInfo{
-            collection_address: self.collection_address,
-            owner_address: self.owner,
+            collectionAddress: self.collectionAddress,
+            ownerAddress: self.owner,
             index: self.index,
             isClassB: self.isClassB,
+            voteStateId: self.voteStateId,
             balanceWithdrawn: self.balanceWithdrawn,
-            balance: balance           
+            balance: balance,
         }
     }
 
     // private methods
-    fun notInitialized(): Bool {
-        return (self.owner == self.collection_address);
+    fun assertOwnerMethod() {
+        require(sender() == self.owner, ErrorNotAuthorized);
     }
+
+    fun assertCollectionMethod() {
+        require(sender() == self.collectionAddress, ErrorNotAuthorized);
+    }
+
+    fun notInitialized(): Bool {
+        return (self.owner == self.collectionAddress);
+    }
+
+    fun voteReply(queryId: Int, status: Int) {
+        send(SendParameters{
+            to: self.owner,
+            bounce: false,
+            value: 0,
+            mode: SendRemainingValue,
+            body: AuthItemVoteReply{                
+                queryId: queryId,
+                status: status
+            }.toCell(),
+        });        
+    }
+
 }
