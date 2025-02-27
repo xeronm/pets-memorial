@@ -13,33 +13,29 @@ const VoteOpMintAuthItem: Int = 0x3ef428b9;
 const VoteOpUpdateSettings: Int = 0x4219f222;
 const VoteOpTransferAuthItem: Int = 0x9d9f8663;
 
+fun enumToSpeciesName(species: Int): String {
+    if (species == 1) {
+        return "Dog";
+    }
+    else if (species == 2) {
+        return "Cat"
+    }
+    return "";
+}
+
 struct PetMemoryNftImmutableData {
     species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3... - reserved;
     name: String;
     sex: Int as uint1; // 0 - male, 1 - female
     speciesName: String?;    
     breed: String?;
-    countryCode: Int as uint10; // 10 bytes ISO 3166-1 numeric-3 code, e.g. 643; 0 - means unspecified or unknown
+    lang: Int? as uint10; // ISO 639 two letter language code encoded as 5bits for every letter,
+                         // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
+    countryCode: Int as uint10; // ISO 3166-1 alpha-2 code, e.g. "ru"; encoded as 5bits for every letter,
+                                // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
     location: String?; // It's preferred to use Postal Code
-    birthDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0 - means unspecified or unknown
-    deathDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0 - means unspecified or unknown
-}
-
-struct PetMemoryNftData {
-    uri: String?;
-    description: String?; // Memo
-    image: String?;
-    imageData: Cell?;
-}
-
-struct PetMemoryNftContent {
-    immData: PetMemoryNftImmutableData;
-    data: PetMemoryNftData;
-}
-
-struct PetMemoryNftInit {
-    data: PetMemoryNftData;
-    storageReserve: Int as uint8;
+    birthDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0x00 - means unspecified or unknown
+    deathDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0x00 - means unspecified or unknown
 }
 
 struct MintAuthItemItem {
@@ -63,7 +59,8 @@ message(0x3ef428b9) MintAuthItems {
 message(0x4219f222) UpdateSettings {
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
-    feeClassB: Int as uint8;  
+    feeClassB: Int as uint8;
+    data: NftMutableMetaData?;
 }
 
 message(0x9d9f8663) TransferAuthItems {
@@ -157,12 +154,37 @@ message AuthItemTransfer {
 }
 
 // PetMemoryNft Producer
+struct PetMemoryNftContent {
+    immData: PetMemoryNftImmutableData;
+    data: NftMutableMetaData;
+}
+
+struct PetMemoryNftInit {
+    immData: PetMemoryNftImmutableData;
+    data: NftMutableMetaData;
+    storageReserve: Int as uint8;
+}
+
 message PetMemoryNftUpdate {
     queryId: Int as uint64;
-    data: PetMemoryNftData;
+    data: NftMutableMetaData;
+}
+
+// NFT Collection Interface
+struct CollectionData {
+    nextItemIndex: Int;
+    collectionContent: Cell;
+    ownerAddress: Address;
 }
 
 // NFT Item Interface
+struct NftMutableMetaData {
+    uri: String?;
+    description: String?;
+    image: String?;
+    imageData: String?;
+}
+
 message(0x5fcc3d14) Transfer {
     queryId: Int as uint64;
     newOwner: Address;

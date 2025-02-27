@@ -9,15 +9,14 @@ contract PetMemoryNft {
     collectionAddress: Address;
     index: Int;
     owner: Address?;
-    immData: PetMemoryNftImmutableData;
-    data: PetMemoryNftData?;
+    immData: PetMemoryNftImmutableData?;
+    data: NftMutableMetaData?;
 
-    init(collectionAddress: Address, index: Int, immData: PetMemoryNftImmutableData) {
+    init(collectionAddress: Address, index: Int) {
         require(sender() == collectionAddress, ErrorNotAuthorized);
         self.collectionAddress = collectionAddress;
         self.owner = collectionAddress;
         self.index = index;
-        self.immData = immData;   
     }
 
     receive() {
@@ -26,8 +25,9 @@ contract PetMemoryNft {
     receive(msg: Transfer){
         require(sender() == self.collectionAddress, ErrorNotAuthorized);
         let storageReserve: Int = self.storageReserve;      
-        if (self.data == null) { // not initialized
+        if (!self.isInitialized()) {
             let init = PetMemoryNftInit.fromCell(msg.customPayload);
+            self.immData = init.immData;
             self.data = init.data;
             storageReserve = unpackQint(init.storageReserve);
         }
@@ -58,7 +58,7 @@ contract PetMemoryNft {
                 }.toCell()
             });
         }
-        if (msg.responseDestination != null) {
+        if (msg.responseDestination != null && msg.responseDestination != newAddress(0, 0)) {
             send(SendParameters {
                 to: msg.responseDestination!!,
                 value: restAmount,
@@ -95,7 +95,7 @@ contract PetMemoryNft {
         }.toCell());
     }    
 
-    receive("destroy") {
+    receive("Destroy") {
         require(sender() == self.owner, ErrorNotAuthorized);
         self.owner = null;
         send(SendParameters{
@@ -108,16 +108,21 @@ contract PetMemoryNft {
     }    
 
     get fun get_nft_data(): GetNftData {
+        require(self.isInitialized(), ErrorValidation);
         return GetNftData {
-            isInitialized: self.data != null, 
+            isInitialized: self.isInitialized(), 
             index: self.index, 
             collectionAddress: self.collectionAddress, 
             ownerAddress: self.owner!!,
             individualContent: PetMemoryNftContent{
-                immData: self.immData,
+                immData: self.immData!!,
                 data: self.data!!,
             }.toCell()
         };
+    }
+
+    fun isInitialized(): Bool {
+        return (self.immData != null) && (self.data != null);
     }
 
 }

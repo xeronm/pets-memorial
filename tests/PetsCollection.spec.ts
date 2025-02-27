@@ -3,6 +3,8 @@ import {
     SendMessageResult, TreasuryContract, printTransactionFees 
 } from '@ton/sandbox';
 import { toNano, fromNano, beginCell, Dictionary, Address } from '@ton/core';
+import { NFTDictValueSerializer } from './dict';
+import { sha256 } from 'ton-crypto';
 import { 
     PetsCollection, 
     loadAuthItemWithdrawResult,
@@ -12,6 +14,8 @@ import {
     storeTransferAuthItems,
     TransferAuthItemItem,
     MintAuthItemItem,
+    PetMemoryNftImmutableData,
+    NftMutableMetaData,
 } from '../wrappers/PetsCollection';
 import '@ton/test-utils';
 import { AuthItem } from '../build/PetsCollection/tact_AuthItem';
@@ -20,6 +24,7 @@ import './jest';
 const fs = require('node:fs');
 import { transactionStringify } from './jest';
 import { PetMemoryNft } from '../build/PetsCollection/tact_PetMemoryNft';
+
 
 
 const ExitCodes = {
@@ -45,6 +50,9 @@ const MaxTonsDifference = toNano('0.001');
 const MaxFeeStoragePerYear = {
     PetsCollection:     toNano('0.05'),
     AuthItem:           toNano('0.015'),
+    MemoryNftSmall:     toNano('0.021'),
+    MemoryNftMedium:    toNano('0.027'),
+    MemoryNftBig:       toNano('0.047'),
 }
 
 const StorageTonsReserve = {
@@ -57,39 +65,42 @@ const MaxGasConsumption = {
     ExtMessage:         toNano('0.0025'),
     ExtInForwardFee:    toNano('0.0003'),
     //
-    Deposit:            toNano('0.0018'),
+    Deposit:            toNano('0.0023'),
     //
-    Deploy:             toNano('0.0147'),
+    Deploy:             toNano('0.0154'),
+    DeployInForwardFee: toNano('0.0228'),
     MintAuthItem:       toNano('0.0033'),
     MintAuthItemInForwardFee: toNano('0.005'),
     DeployResult:       toNano('0.0002'),
     //
     Withdraw:           toNano('0.0045'),
-    _Withdraw:          toNano('0.0084'),
+    _Withdraw:          toNano('0.0093'),
     _WithdrawReply:     toNano('0.0060'),    
     WithdrawResult:     toNano('0.0002'),
     //
     PutToVoteUpdateSettings:    toNano('0.0045'),
-    _PutToVoteUpdateSettings:   toNano('0.0079'),
+    _PutToVoteUpdateSettings:   toNano('0.0086'),
 
     PutToVoteMintAuthItem:      toNano('0.0048'),
-    _PutToVoteMintAuthItem:      toNano('0.0280'),
+    _PutToVoteMintAuthItem:      toNano('0.0292'),
 
     _PutToVoteReply:   toNano('0.0046'),
     PutToVoteResult:   toNano('0.0002'),
 
     //
-    MintPetMemoryNft:   toNano('0.022'),
-    _MintPetMemoryNft:  toNano('0.011'),
+    MintPetMemoryNft:   toNano('0.0235'),
+    _MintPetMemoryNft:  toNano('0.0116'),
     _MintPetMemoryNftInForwardFee: toNano('0.009'),
     DestroyNft:         toNano('0.009'),
 }
+
 
 const MinTransactionTons = {
     get CollectionDeploy(): bigint {
         return StorageTonsReserve.Collection +
             StorageTonsReserve.AuthItem +
-            MaxGasConsumption.Deploy +            
+            MaxGasConsumption.Deploy +
+            MaxGasConsumption.DeployInForwardFee +
             MaxGasConsumption.MintAuthItem +
             MaxTonsDifference;
     },
@@ -386,6 +397,13 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeStorage: 0x3An,
             feeClassA: 0n,
             feeClassB: 0n,
+            data: {
+                $$type: 'NftMutableMetaData',
+                description: "My Pets Memorial",
+                image: null,
+                imageData: null,
+                uri: null,
+            }
         })(msg);
         msg.endCell();
 
@@ -643,6 +661,7 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeStorage: 0x3An,
             feeClassA: 0n,
             feeClassB: 0n,
+            data: null,
         })(msg);
         msg.endCell();
 
@@ -1126,6 +1145,36 @@ describe('PetsCollection PetMemoryNft', () => {
     let deployResult: SendMessageResult;
     let resultReport: any;
 
+    const nftData: NftMutableMetaData = {
+        $$type: 'NftMutableMetaData',
+        uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
+        image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
+        imageData: null,
+        description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
+                    "on the way to the gym. A large, gray cat, thin as a skeleton, was running" +
+                    " out of an abandoned private house, looked at people with piercing emerald eyes," +
+                    " and screamed. We tried to feed him, but that day I realized that if he did not" +
+                    " run out at some day, I would not be able to forgive myself. An hour later, my" +
+                    " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
+                    " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
+                    " and dozens of visits to vets. Several times we thought that he would not get out," +
+                    " but he had an iron will to live. However, on 11/15/2024, he passed away."
+    }
+
+    const nftImmData: PetMemoryNftImmutableData = {
+        $$type: 'PetMemoryNftImmutableData',
+        species: 2n,
+        name: 'Marcus',
+        sex: 0n,
+        speciesName: null,
+        breed: 'Nibelung',
+        lang: 0x8Dn,         // "en"
+        countryCode: 0x234n, // "ru"
+        location: 'Krasnodar 350020',
+        birthDate: 0n,
+        deathDate: 0x20241115n,
+    }
+
     beforeAll(async () => {
         resultReport = {};
     });
@@ -1134,11 +1183,12 @@ describe('PetsCollection PetMemoryNft', () => {
         console.log(resultReport);
     });
 
-    async function mintNft(feeClassA: bigint = 0n, feeClassB: bigint = 0n, newOwner: Address | null = null) {
+    async function mintNft(feeClassA: bigint = 0n, feeClassB: bigint = 0n, 
+        newOwner: Address | null = null, data?: NftMutableMetaData) {
         const mintNftResult = await petsCollection.send(
             user1.getSender(),
             {
-                value: MinTransactionTons.MintPetMemoryNft
+                value: MinTransactionTons.MintPetMemoryNft + (data ? toNano('0.1') : 0n)
             },
             {
                 $$type: 'MintPetMemoryNft',
@@ -1148,33 +1198,8 @@ describe('PetsCollection PetMemoryNft', () => {
                 newOwner: newOwner,
                 content: {
                     $$type: 'PetMemoryNftContent',
-                    immData: {
-                        $$type: 'PetMemoryNftImmutableData',
-                        species: 2n,
-                        name: 'Marcus',
-                        sex: 0n,
-                        speciesName: null,
-                        breed: 'Nibelung',
-                        countryCode: 643n,
-                        location: 'Krasnodar (350020)',
-                        birthDate: 0n,
-                        deathDate: 20241115n,
-                    },
-                    data: {
-                        $$type: 'PetMemoryNftData',
-                        uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
-                        image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
-                        imageData: null,
-                        description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
-                                    "on the way to the gym. A large, gray cat, thin as a skeleton, was running" +
-                                    " out of an abandoned private house, looked at people with piercing emerald eyes," +
-                                    " and screamed. We tried to feed him, but that day I realized that if he did not" +
-                                    " run out at some day, I would not be able to forgive myself. An hour later, my" +
-                                    " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
-                                    " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
-                                    " and dozens of visits to vets. Several times we thought that he would not get out," +
-                                    " but he had an iron will to live. However, on 11/15/2024, he passed away."
-                    }
+                    immData: nftImmData,
+                    data: data ?? nftData
                 }
             }
         );
@@ -1267,6 +1292,88 @@ describe('PetsCollection PetMemoryNft', () => {
         }
     });
 
+
+    it('verify storage fees for 1 Year', async () => {
+        const { nftItem: nftItem1 } = await mintNft(0n, 0n, null, {
+                $$type: 'NftMutableMetaData',
+                description: null,
+                image: null,
+                uri: null,
+                imageData: null
+            });
+        const { nftItem: nftItem2 } = await mintNft();
+
+
+        const { nftItem: nftItem3 } = await mintNft(0n, 0n, null, {
+                ...nftData, 
+                imageData: fs.readFileSync('./tests/marcus-onchain-128x128.jpg', { encoding: 'ascii' })
+            });
+
+        const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
+        const time2 = time1 + 365 * 24 * 60 * 60;                                  // offset for a year
+        
+        blockchain.now = time2;                                                    // set current time
+
+        expect(nftItem1).toBeDefined();
+        if (nftItem1) {
+            const res1 = await nftItem1.send(
+                user1.getSender(),
+                {
+                    value: MinTransactionAmount,
+                },
+                null
+            )
+
+            const tx1 = res1.transactions[1];                                          // extract the transaction that executed in a year
+            expect(tx1.description.type).toEqual('generic');
+
+            // Check that the storagePhase fees are less than 0.02 TON over the course of a year
+            if ('storagePhase' in tx1.description) {
+                resultReport.memoryNftSmallFeeStorage = fromNano(tx1.description.storagePhase?.storageFeesCollected ?? 0);
+                expect(tx1.description.storagePhase?.storageFeesCollected).toBeLessThanOrEqual(MaxFeeStoragePerYear.MemoryNftSmall);
+            }
+        }
+
+        expect(nftItem2).toBeDefined();
+        if (nftItem2) {
+            const res2 = await nftItem2.send(
+                user1.getSender(),
+                {
+                    value: MinTransactionAmount,
+                },
+                null
+            )
+
+            const tx2 = res2.transactions[1];                                          // extract the transaction that executed in a year
+            expect(tx2.description.type).toEqual('generic');
+
+            // Check that the storagePhase fees are less than 0.01 TON over the course of a year
+            if ('storagePhase' in tx2.description) {
+                resultReport.memoryNftMediumFeeStorage = fromNano(tx2.description.storagePhase?.storageFeesCollected ?? 0);
+                expect(tx2.description.storagePhase?.storageFeesCollected).toBeLessThanOrEqual(MaxFeeStoragePerYear.MemoryNftMedium);
+            }
+        }
+
+        expect(nftItem3).toBeDefined();
+        if (nftItem3) {
+            const res3 = await nftItem3.send(
+                user1.getSender(),
+                {
+                    value: MinTransactionAmount,
+                },
+                null
+            )
+
+            const tx3 = res3.transactions[1];                                          // extract the transaction that executed in a year
+            expect(tx3.description.type).toEqual('generic');
+
+            // Check that the storagePhase fees are less than 0.01 TON over the course of a year
+            if ('storagePhase' in tx3.description) {
+                resultReport.memoryNftBigFeeStorage = fromNano(tx3.description.storagePhase?.storageFeesCollected ?? 0);
+                expect(tx3.description.storagePhase?.storageFeesCollected).toBeLessThanOrEqual(MaxFeeStoragePerYear.MemoryNftBig);
+            }
+        }        
+    });    
         
     it('shloud not mint NFT (InsufficientFunds)', async () => {
         const { mintNftResult } = await mintNft(0x40n, 0x40n);
@@ -1289,7 +1396,7 @@ describe('PetsCollection PetMemoryNft', () => {
                 {
                     value: MinTransactionTons.DestroyPetMemoryNft,
                 },
-                'destroy'
+                'Destroy'
             );            
 
             console.log('Destroy NFT transaction details:');
@@ -1317,7 +1424,7 @@ describe('PetsCollection PetMemoryNft', () => {
                 {
                     value: MinTransactionTons.DestroyPetMemoryNft,
                 },
-                'destroy'
+                'Destroy'
             );
     
             expect(destroyResult.transactions).toHaveTransaction({
@@ -1330,4 +1437,54 @@ describe('PetsCollection PetMemoryNft', () => {
         }
     });
 
+
+    it('shloud get_nft_address_by_index()', async () => {
+        const { nftItem } = await mintNft();
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const nftData = await nftItem.getGetNftData();
+
+            const nftAddress = await petsCollection.getGetNftAddressByIndex(nftData.index);
+            expect(nftAddress).toEqualAddress(nftItem.address);
+        }
+    });    
+
+
+    it('shloud get_nft_content()', async () => {
+        const imageData = fs.readFileSync('./tests/marcus-onchain-128x128.jpg', { encoding: 'ascii' });
+        const { nftItem } = await mintNft(0n, 0n, null, {
+            ...nftData, 
+            imageData: imageData
+        });
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const nftData1 = await nftItem.getGetNftData();
+
+            const nftContent = await petsCollection.getGetNftContent(nftData1.index, nftData1.individualContent);
+            const data = nftContent.asSlice();
+            const flag = data.loadUint(8);
+            expect(flag).toBe(0x00);
+
+            const dict = data.loadDict(
+                Dictionary.Keys.Buffer(32),
+                NFTDictValueSerializer
+            )
+
+            const keys = ['uri', 'image', 'image_data', 'name', 'description'];
+            const attributes: {[key: string]: string} = {};
+            for (const key of keys) {
+                const dictKey = await sha256(key);
+                const dictValue = dict.get(dictKey);
+                if (dictValue) {
+                    attributes[key] = dictValue.content.toString('utf-8');
+                }
+            }
+            expect(attributes.description).toBe(nftData.description);
+            expect(attributes.name).toBe('Marcus, Cat, RU, Krasnodar 350020 (* ~ 2024-11-15)');
+            expect(attributes.image_data.length).toBeGreaterThan(3000);
+            expect(attributes.image_data).toBe(imageData);
+        }
+    });      
 });
