@@ -319,6 +319,10 @@ contract PetsCollection {
         return self.calcAvailableForWithdraw(isClassB, myBalance(), withdrawnBalance);
     }
     
+    get fun authItemAddressByIndex(index: Int, isClassB: Bool): Address {
+        return self.calcAuthItemAddress(index, isClassB);
+    }
+
     // Private Methods
     fun assertFromMySelf() {
         require(sender() == myAddress(), ErrorNotAuthorized);

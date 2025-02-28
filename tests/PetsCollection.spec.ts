@@ -1438,7 +1438,7 @@ describe('PetsCollection PetMemoryNft', () => {
     });
 
 
-    it('shloud get_nft_address_by_index()', async () => {
+    it('get_nft_address_by_index()', async () => {
         const { nftItem } = await mintNft();
 
         expect(nftItem).not.toBeUndefined();
@@ -1451,7 +1451,7 @@ describe('PetsCollection PetMemoryNft', () => {
     });    
 
 
-    it('shloud get_nft_content()', async () => {
+    it('get_nft_content()', async () => {
         const imageData = fs.readFileSync('./tests/marcus-onchain-128x128.jpg', { encoding: 'ascii' });
         const { nftItem } = await mintNft(0n, 0n, null, {
             ...nftData, 
@@ -1482,6 +1482,8 @@ describe('PetsCollection PetMemoryNft', () => {
                 }
             }
             expect(attributes.description).toBe(nftData.description);
+            expect(attributes.uri).toBe(nftData.uri);
+            expect(attributes.image).toBe(nftData.image);
             expect(attributes.name).toBe('Marcus, Cat, RU, Krasnodar 350020 (* ~ 2024-11-15)');
             expect(attributes.image_data.length).toBeGreaterThan(3000);
             expect(attributes.image_data).toBe(imageData);
