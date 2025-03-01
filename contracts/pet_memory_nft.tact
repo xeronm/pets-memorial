@@ -86,7 +86,7 @@ contract PetMemoryNft {
         });     
     }
 
-    receive(msg: PetMemoryNftUpdate) {
+    receive(msg: EditContent) {
         require(sender() == self.owner, ErrorNotAuthorized);
         self.data = msg.data;
 

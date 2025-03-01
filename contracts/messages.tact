@@ -165,11 +165,6 @@ struct PetMemoryNftInit {
     storageReserve: Int as uint8;
 }
 
-message PetMemoryNftUpdate {
-    queryId: Int as uint64;
-    data: NftMutableMetaData;
-}
-
 // NFT Collection Interface
 struct CollectionData {
     nextItemIndex: Int;
@@ -182,7 +177,7 @@ struct NftMutableMetaData {
     uri: String?;
     description: String?;
     image: String?;
-    imageData: String?;
+    imageData: Cell?;
 }
 
 message(0x5fcc3d14) Transfer {
@@ -198,6 +193,11 @@ message(0x05138d91) OwnershipAssigned {
     queryId: Int as uint64;
     prevOwner: Address;
     forwardPayload: Slice as remaining;
+}
+
+message(0x1a0b9d51) EditContent {
+    queryId: Int as uint64;
+    data: NftMutableMetaData;
 }
 
 message(0x2fcb26a2) GetStaticData {

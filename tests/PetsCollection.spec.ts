@@ -3,7 +3,8 @@ import {
     SendMessageResult, TreasuryContract, printTransactionFees 
 } from '@ton/sandbox';
 import { toNano, fromNano, beginCell, Dictionary, Address } from '@ton/core';
-import { NFTDictValueSerializer } from './dict';
+import { NFTDictValueSerializer } from '../utils/dict';
+import { toTextCellSnake } from '../utils/nftContent';
 import { sha256 } from 'ton-crypto';
 import { 
     PetsCollection, 
@@ -135,6 +136,9 @@ const MinTransactionTons = {
 
 function dumpransactions(txs: BlockchainTransaction[]) {
     fs.writeFileSync('./transactions.json', transactionStringify(txs)); 
+}
+
+function describe_(...args: any) {
 }
 
 describe('PetsCollection Deploy', () => {
@@ -1306,7 +1310,7 @@ describe('PetsCollection PetMemoryNft', () => {
 
         const { nftItem: nftItem3 } = await mintNft(0n, 0n, null, {
                 ...nftData, 
-                imageData: fs.readFileSync('./tests/marcus-onchain-128x128.jpg', { encoding: 'ascii' })
+                imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg'))
             });
 
         const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
@@ -1452,10 +1456,11 @@ describe('PetsCollection PetMemoryNft', () => {
 
 
     it('get_nft_content()', async () => {
-        const imageData = fs.readFileSync('./tests/marcus-onchain-128x128.jpg', { encoding: 'ascii' });
+        const imageData = fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg');
+        console.log(imageData);
         const { nftItem } = await mintNft(0n, 0n, null, {
             ...nftData, 
-            imageData: imageData
+            imageData: toTextCellSnake(imageData),
         });
 
         expect(nftItem).not.toBeUndefined();
@@ -1473,12 +1478,18 @@ describe('PetsCollection PetMemoryNft', () => {
             )
 
             const keys = ['uri', 'image', 'image_data', 'name', 'description'];
-            const attributes: {[key: string]: string} = {};
+            const attributes: {[key: string]: string | Buffer} = {};
             for (const key of keys) {
                 const dictKey = await sha256(key);
                 const dictValue = dict.get(dictKey);
                 if (dictValue) {
-                    attributes[key] = dictValue.content.toString('utf-8');
+                    if (key === 'image_data') {
+                        attributes[key] = dictValue.content;
+                        console.log(dictValue.content);
+                    }
+                    else {
+                        attributes[key] = dictValue.content.toString('utf-8');    
+                    }
                 }
             }
             expect(attributes.description).toBe(nftData.description);
@@ -1486,7 +1497,7 @@ describe('PetsCollection PetMemoryNft', () => {
             expect(attributes.image).toBe(nftData.image);
             expect(attributes.name).toBe('Marcus, Cat, RU, Krasnodar 350020 (* ~ 2024-11-15)');
             expect(attributes.image_data.length).toBeGreaterThan(3000);
-            expect(attributes.image_data).toBe(imageData);
+            expect(attributes.image_data).toStrictEqual(imageData);
         }
     });      
 });

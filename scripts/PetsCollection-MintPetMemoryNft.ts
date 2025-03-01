@@ -4,16 +4,17 @@ import {
   NftMutableMetaData, 
   PetMemoryNftImmutableData 
 } from '../wrappers/PetsCollection';
+import { toTextCellSnake } from '../utils/nftContent';
 import { PetMemoryNft } from '../wrappers/PetMemoryNft';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 const fs = require('node:fs');
 
 
-const nftDataBig: NftMutableMetaData = {
+const nftDataImageOnchain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
   image: null,
-  imageData: fs.readFileSync('./tests/marcus-onchain-96x96.jpg', { encoding: 'ascii' }),
+  imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg')),
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
               "on the way to the gym. A large, gray cat, thin as a skeleton, was running" +
               " out of an abandoned private house, looked at people with piercing emerald eyes," +
@@ -25,13 +26,15 @@ const nftDataBig: NftMutableMetaData = {
               " but he had an iron will to live. However, on 11/15/2024, he passed away."
 }
 
-const nftData: NftMutableMetaData = {
+const nftDataImageOffChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
   image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
   imageData: null,
   description: "On-chain overriden description"
 }
+
+const nftData = nftDataImageOffChain;
 
 const nftImmData: PetMemoryNftImmutableData = {
   $$type: 'PetMemoryNftImmutableData',
@@ -91,12 +94,15 @@ export async function run(provider: NetworkProvider, args: string[]) {
     attempt++;
   }
 
-  ui.clearActionPrompt();
-  ui.write('Deployed successfully!');
-
   const nftAddress = await petsCollection.getGetNftAddressByIndex(collDataBefore.nextItemIndex);
   console.log('NFT Address:', nftAddress);
 
+  await provider.waitForDeploy(nftAddress);
+  console.log('NFT deployed:', nftAddress);
+
   const nft = provider.open(PetMemoryNft.fromAddress(nftAddress));
   console.log('NFT Info:', await nft.getGetNftData());
+
+  ui.clearActionPrompt();
+  ui.write('Deployed successfully!');  
 }

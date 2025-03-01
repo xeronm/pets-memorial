@@ -228,6 +228,9 @@ contract PetsCollection {
             if (self.data!!.image != null) {
                 dict.set(FieldImage, self.data!!.image!!.asMetadataCell());
             }
+            if (self.data!!.imageData != null) {
+                dict.set(FieldImage, self.data!!.imageData!!);
+            }
         }
 
         return CollectionData{
@@ -285,7 +288,7 @@ contract PetsCollection {
             dict.set(FieldImage, content.data.image!!.asMetadataCell());
         }
         if (content.data.imageData != null) {
-            dict.set(FieldImageData, content.data.imageData!!.asMetadataCell());
+            dict.set(FieldImageData, content.data.imageData!!);
         }
 
         return beginCell()
