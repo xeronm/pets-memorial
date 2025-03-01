@@ -55,7 +55,7 @@ contract PetsCollection {
     // Mutable Internal Attributes
     // - Minting data
     authIndexSeq: Int as uint4;
-    nftIndexSeq: Int;
+    nftIndexSeq: Int as uint40;
     classBCount: Int as uint4;
     classACount: Int as uint4;
     // - Balances
@@ -74,6 +74,8 @@ contract PetsCollection {
     voteDurationHours: Int as uint8;
     //
     data: NftMutableMetaData?;
+    dataClassA: NftMutableMetaData?;
+    dataClassB: NftMutableMetaData?;
 
     init() {
         //
@@ -216,29 +218,9 @@ contract PetsCollection {
     }
 
     get fun get_collection_data(): CollectionData {
-        let dict: map<Int as uint256, Cell> = emptyMap();
-        dict.set(FieldName, PetsCollectionName.asMetadataCell());
-        if (self.data != null) {
-            if (self.data!!.uri != null) {
-                dict.set(FieldUri, self.data!!.uri!!.asMetadataCell());
-            }
-            if (self.data!!.description != null) {
-                dict.set(FieldDescription, self.data!!.description!!.asMetadataCell());
-            }
-            if (self.data!!.image != null) {
-                dict.set(FieldImage, self.data!!.image!!.asMetadataCell());
-            }
-            if (self.data!!.imageData != null) {
-                dict.set(FieldImage, self.data!!.imageData!!);
-            }
-        }
-
         return CollectionData{
             nextItemIndex: self.nftIndexSeq,
-            collectionContent: beginCell()
-                                .storeUint(0, 8) // On-chain content layout
-                                .storeMaybeRef(dict.asCell()!!)
-                                .endCell(),
+            collectionContent: self.nftMetadataContent(0),
             ownerAddress: newAddress(0, 0)
         }
     }
@@ -248,53 +230,8 @@ contract PetsCollection {
         return contractAddress(nftInit);        
     }
 
-
     get fun get_nft_content(index: Int, individualContent: Cell): Cell {
-        let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent);
-
-        let nameStr: StringBuilder = beginString()
-            .concat(content.immData.name)
-            .concat(", ")
-            .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : enumToSpeciesName(content.immData.species));
-
-        // TODO: Add serialization depends on serialization mask each bit for each feature
-        if (content.immData.countryCode > 0) {
-            nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
-        }
-
-        if (content.immData.location != null) {
-            nameStr = nameStr.concat(", ").concat(content.immData.location!!);
-        }
-
-        if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
-            nameStr = nameStr
-                .concat(" (")
-                .concat(dateMaskToString(content.immData.birthDate))
-                .concat(" ~ ")
-                .concat(dateMaskToString(content.immData.deathDate))
-                .concat(")");
-        }
-
-        let dict: map<Int as uint256, Cell> = emptyMap();
-        dict.set(FieldName, nameStr.toString().asMetadataCell());
-
-        if (content.data.uri != null) {
-            dict.set(FieldUri, content.data.uri!!.asMetadataCell());
-        }
-        if (content.data.description != null) {
-            dict.set(FieldDescription, content.data.description!!.asMetadataCell());
-        }
-        if (content.data.image != null) {
-            dict.set(FieldImage, content.data.image!!.asMetadataCell());
-        }
-        if (content.data.imageData != null) {
-            dict.set(FieldImageData, content.data.imageData!!);
-        }
-
-        return beginCell()
-                .storeUint(0, 8) // On-chain content layout
-                .storeMaybeRef(dict.asCell()!!)
-                .endCell();
+        return self.nftMetadataContent(index, individualContent);
     }
 
     get fun info(): Info {
@@ -457,6 +394,73 @@ contract PetsCollection {
                 }.toCell(),
             });
         }        
+    }
+
+    fun nftMetadataContent(index: Int, individualContent: Cell?): Cell {
+        let dict: map<Int as uint256, Cell> = emptyMap();
+
+        let data: NftMutableMetaData? = null;
+        if (index == 0) {
+            dict.set(FieldName, PetsCollectionName.asMetadataCell());
+            // PetsCollection
+            data = self.data;
+        }
+        else if (index >> 40) {
+            // AuthItem
+            dict.set(FieldName, ((index & 1) ? "Auth Class B" : "Auth Class A").asMetadataCell());
+            data = (index & 1) ? self.dataClassA : self.dataClassB;
+        } 
+        else {
+            // PetsMemoryNFT
+            let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent!!);
+
+            let nameStr: StringBuilder = beginString()
+                .concat(content.immData.name)
+                .concat(", ")
+                .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : enumToSpeciesName(content.immData.species));
+
+            // TODO: Add serialization depends on serialization mask each bit for each feature
+            if (content.immData.countryCode > 0) {
+                nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
+            }
+
+            if (content.immData.location != null) {
+                nameStr = nameStr.concat(", ").concat(content.immData.location!!);
+            }
+
+            if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
+                nameStr = nameStr
+                    .concat(" (")
+                    .concat(dateMaskToString(content.immData.birthDate))
+                    .concat(" ~ ")
+                    .concat(dateMaskToString(content.immData.deathDate))
+                    .concat(")");
+            }
+
+            dict.set(FieldName, nameStr.toString().asMetadataCell());
+            data = content.data;
+        }
+
+        if (data != null) {
+            let mdata: NftMutableMetaData = data!!;
+            if (mdata.uri != null) {
+                dict.set(FieldUri, mdata.uri!!.asMetadataCell());
+            }
+            if (mdata.description != null) {
+                dict.set(FieldDescription, mdata.description!!.asMetadataCell());
+            }
+            if (mdata.image != null) {
+                dict.set(FieldImage, mdata.image!!.asMetadataCell());
+            }
+            if (mdata.imageData != null) {
+                dict.set(FieldImageData, mdata.imageData!!);
+            }
+        }
+
+        return beginCell()
+                .storeUint(0, 8) // On-chain content layout
+                .storeMaybeRef(dict.asCell()!!)
+                .endCell();
     }
 
 }

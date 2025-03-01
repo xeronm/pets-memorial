@@ -110,7 +110,7 @@ contract AuthItem {
 
     receive(msg: WithdrawReply) {
         self.assertCollectionMethod();
-        require(self.notInitialized() || (self.balanceWithdrawn <= msg.balanceWithdrawn), ErrorAssertion);
+        require(!self.isInitialized() || (self.balanceWithdrawn <= msg.balanceWithdrawn), ErrorAssertion);
         let value: Int = msg.balanceWithdrawn - self.balanceWithdrawn;
         self.balanceWithdrawn = msg.balanceWithdrawn;
 
@@ -129,8 +129,7 @@ contract AuthItem {
 
     receive(msg: AuthItemTransfer){
         self.assertCollectionMethod();
-        let initState = self.notInitialized();
-        if (initState) {
+        if (!self.isInitialized()) {
             self.balanceWithdrawn = msg.balanceWithdrawn;
         }
         self.owner = msg.newOwner;
@@ -149,6 +148,17 @@ contract AuthItem {
         }
     }
 
+    get fun get_nft_data(): GetNftData {
+        require(self.isInitialized(), ErrorValidation);
+        return GetNftData {
+            isInitialized: self.isInitialized(), 
+            index: ((self.index << 1) + self.isClassB) << 40,  // 40-bit offset 
+            collectionAddress: self.collectionAddress, 
+            ownerAddress: self.owner,
+            individualContent: emptyCell(),
+        };
+    }
+
     // private methods
     fun assertOwnerMethod() {
         require(sender() == self.owner, ErrorNotAuthorized);
@@ -158,7 +168,7 @@ contract AuthItem {
         require(sender() == self.collectionAddress, ErrorNotAuthorized);
     }
 
-    fun notInitialized(): Bool {
+    fun isInitialized(): Bool {
         return (self.owner == self.collectionAddress);
     }
 

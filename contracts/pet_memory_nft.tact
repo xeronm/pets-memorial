@@ -7,7 +7,7 @@ contract PetMemoryNft {
     override const storageReserve: Int = ton("0.01");
 
     collectionAddress: Address;
-    index: Int;
+    index: Int as uint40;
     owner: Address?;
     immData: PetMemoryNftImmutableData?;
     data: NftMutableMetaData?;

@@ -1457,7 +1457,6 @@ describe('PetsCollection PetMemoryNft', () => {
 
     it('get_nft_content()', async () => {
         const imageData = fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg');
-        console.log(imageData);
         const { nftItem } = await mintNft(0n, 0n, null, {
             ...nftData, 
             imageData: toTextCellSnake(imageData),
@@ -1485,7 +1484,6 @@ describe('PetsCollection PetMemoryNft', () => {
                 if (dictValue) {
                     if (key === 'image_data') {
                         attributes[key] = dictValue.content;
-                        console.log(dictValue.content);
                     }
                     else {
                         attributes[key] = dictValue.content.toString('utf-8');    

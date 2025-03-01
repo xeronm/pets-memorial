@@ -90,11 +90,6 @@ message VoteReply {
     status: Int as uint2;
 }
 
-message QueryAuthItemAddress {
-    index: Int as uint4;
-    isClassB: Bool;
-}
-
 message Withdraw {
     queryId: Int as uint64;
     index: Int as uint4;
