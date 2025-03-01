@@ -10,19 +10,19 @@ import { NetworkProvider, sleep } from '@ton/blueprint';
 const fs = require('node:fs');
 
 
-const nftDataImageOnchain: NftMutableMetaData = {
+const nftDataImageOnChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
   image: null,
-  imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg')),
+  imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-256x256.jpg')),
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
-              "on the way to the gym. A large, gray cat, thin as a skeleton, was running" +
+              "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
               " out of an abandoned private house, looked at people with piercing emerald eyes," +
               " and screamed. We tried to feed him, but that day I realized that if he did not" +
               " run out at some day, I would not be able to forgive myself. An hour later, my" +
               " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
               " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
-              " and dozens of visits to vets. Several times we thought that he would not get out," +
+              " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
               " but he had an iron will to live. However, on 11/15/2024, he passed away."
 }
 

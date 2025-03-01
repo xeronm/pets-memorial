@@ -2,10 +2,10 @@ import {
     Blockchain, SandboxContract, BlockchainTransaction,
     SendMessageResult, TreasuryContract, printTransactionFees 
 } from '@ton/sandbox';
-import { toNano, fromNano, beginCell, Dictionary, Address } from '@ton/core';
+import { toNano, fromNano, beginCell, Dictionary, Address, Cell } from '@ton/core';
 import { NFTDictValueSerializer } from '../utils/dict';
 import { toTextCellSnake } from '../utils/nftContent';
-import { sha256 } from 'ton-crypto';
+import { sha256 } from '@ton/crypto';
 import { 
     PetsCollection, 
     loadAuthItemWithdrawResult,
@@ -25,7 +25,6 @@ import './jest';
 const fs = require('node:fs');
 import { transactionStringify } from './jest';
 import { PetMemoryNft } from '../build/PetsCollection/tact_PetMemoryNft';
-
 
 
 const ExitCodes = {
@@ -66,30 +65,30 @@ const MaxGasConsumption = {
     ExtMessage:         toNano('0.0025'),
     ExtInForwardFee:    toNano('0.0003'),
     //
-    Deposit:            toNano('0.0023'),
+    Deposit:            toNano('0.0034'),
     //
     Deploy:             toNano('0.0166'),
-    DeployInForwardFee: toNano('0.0242'),
+    DeployInForwardFee: toNano('0.0237'),
     MintAuthItem:       toNano('0.0033'),
     MintAuthItemInForwardFee: toNano('0.005'),
     DeployResult:       toNano('0.0002'),
     //
     Withdraw:           toNano('0.0045'),
     _Withdraw:          toNano('0.0109'),
-    _WithdrawReply:     toNano('0.0060'),    
+    _WithdrawReply:     toNano('0.0061'),    
     WithdrawResult:     toNano('0.0002'),
     //
-    PutToVoteUpdateSettings:    toNano('0.0045'),
-    _PutToVoteUpdateSettings:   toNano('0.0101'),
+    PutToVoteUpdateSettings:    toNano('0.0049'),
+    _PutToVoteUpdateSettings:   toNano('0.0146'),
 
     PutToVoteMintAuthItem:      toNano('0.0048'),
-    _PutToVoteMintAuthItem:      toNano('0.0314'),
+    _PutToVoteMintAuthItem:     toNano('0.0314'),
 
-    _PutToVoteReply:   toNano('0.0046'),
+    _PutToVoteReply:   toNano('0.0045'),
     PutToVoteResult:   toNano('0.0002'),
 
     //
-    MintPetMemoryNft:   toNano('0.0241'),
+    MintPetMemoryNft:   toNano('0.0243'),
     _MintPetMemoryNft:  toNano('0.0116'),
     _MintPetMemoryNftInForwardFee: toNano('0.009'),
     DestroyNft:         toNano('0.009'),
@@ -134,12 +133,41 @@ const MinTransactionTons = {
     }
 }
 
-function dumpransactions(txs: BlockchainTransaction[]) {
+function dumpTransactions(txs: BlockchainTransaction[]) {
     fs.writeFileSync('./transactions.json', transactionStringify(txs)); 
 }
 
 function describe_(...args: any) {
 }
+
+async function decodeNftMetadata(cell: Cell): Promise<{[key: string]: string | Buffer}> {
+    const data = cell.asSlice();
+    const flag = data.loadUint(8);
+    expect(flag).toBe(0x00);
+
+    const dict = data.loadDict(
+        Dictionary.Keys.Buffer(32),
+        NFTDictValueSerializer
+    )
+
+    const keys = ['uri', 'image', 'image_data', 'name', 'description'];
+    const attributes: {[key: string]: string | Buffer} = {};
+    for (const key of keys) {
+        const dictKey = await sha256(key);
+        const dictValue = dict.get(dictKey);
+        if (dictValue) {
+            if (key === 'image_data') {
+                attributes[key] = dictValue.content;
+            }
+            else {
+                attributes[key] = dictValue.content.toString('utf-8');    
+            }
+        }
+    }
+
+    return attributes; 
+}
+
 
 describe('PetsCollection Deploy', () => {
     let blockchain: Blockchain;
@@ -225,7 +253,6 @@ describe('PetsCollection Deploy', () => {
             balanceClassB: 0n,
         });        
 
-
         // 5. AuthItem Info
         const authItemInfo = await authItem.getInfo();
 
@@ -243,6 +270,24 @@ describe('PetsCollection Deploy', () => {
             voteStateId: null,
             balanceWithdrawn: 0n,
             balance: authItemInfo.balance
+        });
+
+        // 6. get_collection_data()
+        const data =  await petsCollection.getGetCollectionData();
+        const attributes = await decodeNftMetadata(data.collectionContent);
+        expect(attributes).toStrictEqual({
+            name: 'petsmem-v1',
+        });
+
+        // 7. AuthItem get_nft_data()
+        const nftData = await authItem.getGetNftData();
+        expect(nftData.isInitialized).toBe(true);
+
+        // 8. AuthItem get_nft_content()
+        const nftContent =  await petsCollection.getGetNftContent(nftData.index, nftData.individualContent);
+        const attributes2 = await decodeNftMetadata(nftContent);
+        expect(attributes2).toStrictEqual({
+            name: 'Auth Class A',
         });
     });
         
@@ -319,36 +364,41 @@ describe('PetsCollection AuthItem (Single)', () => {
     it('verify available withdraw balance', async () => {
         // 1. Initial balance = 0.05 TON
         const availableForWithdraw1 = await petsCollection.getAvailableForWithdraw(false, 0n);
+        resultReport.availableForWithdraw1 = fromNano(availableForWithdraw1);
         expect(availableForWithdraw1).toBe(0n);
 
         // 2. Deposit 0.02 TON, less than feeClassATons
         const deposit1 = await petsCollection.send(
             deployer.getSender(),
             {
-                value: toNano("0.02"),
+                value: toNano("0.02") + MaxGasConsumption.Deposit,
             },
             null
         )
         const availableForWithdraw2 = await petsCollection.getAvailableForWithdraw(false, 0n);        
+        resultReport.availableForWithdraw2 = fromNano(availableForWithdraw2);
         expect(availableForWithdraw2).toBe(0n);
 
         // 3. Deposit 0.02 TON, less than feeClassATons
         const deposit2 = await petsCollection.send(
             deployer.getSender(),
             {
-                value: toNano("0.02"),
+                value: toNano("0.02") + MaxGasConsumption.Deposit,
             },
             null
         )
         expect(deposit1.transactions[1].totalFees.coins).toBeLessThanOrEqual(MaxGasConsumption.Deposit);
 
         const availableForWithdraw3 = await petsCollection.getAvailableForWithdraw(false, 0n);
-        expect(availableForWithdraw3).toBeGreaterThan(toNano("0.04") - 2n*MaxGasConsumption.Deposit);
+        resultReport.availableForWithdraw3 = fromNano(availableForWithdraw3);
+        expect(availableForWithdraw3).toBeGreaterThan(toNano("0.04"));
 
         const availableForWithdraw4 = await petsCollection.getAvailableForWithdraw(false, toNano("0.01"));
-        expect(availableForWithdraw4).toBeGreaterThan(toNano("0.04") - 2n*MaxGasConsumption.Deposit - toNano("0.01"));
+        resultReport.availableForWithdraw4 = fromNano(availableForWithdraw4);
+        expect(availableForWithdraw4).toBeGreaterThan(toNano("0.04") - toNano("0.01"));
 
         const availableForWithdraw5 = await petsCollection.getAvailableForWithdraw(false, toNano("0.02"));
+        resultReport.availableForWithdraw5 = fromNano(availableForWithdraw5);
         expect(availableForWithdraw5).toBe(0n);
     });
 
@@ -663,9 +713,27 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeClassA: 0n,
             feeClassB: 0n,
             voteDurationHours: 24n,
-            data: null,
-            dataClassA: null,
-            dataClassB: null,
+            data: {
+                $$type: 'NftMutableMetaData',
+                description: "My Pets Memorial",
+                image: null,
+                imageData: null,
+                uri: null,
+            },
+            dataClassA: {
+                $$type: 'NftMutableMetaData',
+                description: "Governance Token",
+                image: null,
+                imageData: null,
+                uri: null,
+            },
+            dataClassB: {
+                $$type: 'NftMutableMetaData',
+                description: "Stars Funding Token",
+                image: null,
+                imageData: null,
+                uri: null,
+            },
         })(msg);
         msg.endCell();
 
@@ -1155,13 +1223,13 @@ describe('PetsCollection PetMemoryNft', () => {
         image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
         imageData: null,
         description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
-                    "on the way to the gym. A large, gray cat, thin as a skeleton, was running" +
+                    "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
                     " out of an abandoned private house, looked at people with piercing emerald eyes," +
                     " and screamed. We tried to feed him, but that day I realized that if he did not" +
                     " run out at some day, I would not be able to forgive myself. An hour later, my" +
                     " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
                     " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
-                    " and dozens of visits to vets. Several times we thought that he would not get out," +
+                    " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
                     " but he had an iron will to live. However, on 11/15/2024, he passed away."
     }
 
@@ -1467,29 +1535,8 @@ describe('PetsCollection PetMemoryNft', () => {
             const nftData1 = await nftItem.getGetNftData();
 
             const nftContent = await petsCollection.getGetNftContent(nftData1.index, nftData1.individualContent);
-            const data = nftContent.asSlice();
-            const flag = data.loadUint(8);
-            expect(flag).toBe(0x00);
 
-            const dict = data.loadDict(
-                Dictionary.Keys.Buffer(32),
-                NFTDictValueSerializer
-            )
-
-            const keys = ['uri', 'image', 'image_data', 'name', 'description'];
-            const attributes: {[key: string]: string | Buffer} = {};
-            for (const key of keys) {
-                const dictKey = await sha256(key);
-                const dictValue = dict.get(dictKey);
-                if (dictValue) {
-                    if (key === 'image_data') {
-                        attributes[key] = dictValue.content;
-                    }
-                    else {
-                        attributes[key] = dictValue.content.toString('utf-8');    
-                    }
-                }
-            }
+            const attributes = await decodeNftMetadata(nftContent);
             expect(attributes.description).toBe(nftData.description);
             expect(attributes.uri).toBe(nftData.uri);
             expect(attributes.image).toBe(nftData.image);

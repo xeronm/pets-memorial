@@ -1,12 +1,12 @@
 import {
   beginCell,
   Builder,
-  BitBuilder,
-  BitReader,
+
   Cell,
   Dictionary,
   Slice,
 } from '@ton/core';
+const { Buffer } = require('node:buffer');
 
 const ON_CHAIN_CONTENT_PREFIX       = 0x00
 const OFF_CHAIN_CONTENT_PREFIX      = 0x01
@@ -67,7 +67,8 @@ export function makeSnakeCell(data: Buffer): Cell {
 }
 
 export function toTextCellSnake(s: string | Buffer): Cell {
-  let data = (s instanceof Buffer) ? s : Buffer.from(s);
+  console.log(typeof s);
+  let data = (s instanceof Buffer) ? s : Buffer.from(s, 'utf8');
   data = Buffer.concat([Buffer.from([CONTENT_DATA_FORMAT_SNAKE]), data]);
   return makeSnakeCell(data);
 }

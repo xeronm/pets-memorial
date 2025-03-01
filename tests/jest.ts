@@ -1,7 +1,6 @@
 import { BlockchainTransaction } from '@ton/sandbox';
 import { flattenTransaction } from '@ton/test-utils/dist/test/transaction';
-import { fromNano } from '@ton/core';
-import { Address } from 'ton-core';
+import { fromNano, Address } from '@ton/core';
 
 export type TransactionDesc = {
     totalFeesLower?: bigint,

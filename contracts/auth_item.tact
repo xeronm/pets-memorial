@@ -149,7 +149,6 @@ contract AuthItem {
     }
 
     get fun get_nft_data(): GetNftData {
-        require(self.isInitialized(), ErrorValidation);
         return GetNftData {
             isInitialized: self.isInitialized(), 
             index: ((self.index << 1) + (self.isClassB ? 1 : 0)) << 40,  // 40-bit offset 
@@ -169,7 +168,7 @@ contract AuthItem {
     }
 
     fun isInitialized(): Bool {
-        return (self.owner == self.collectionAddress);
+        return (self.owner != self.collectionAddress);
     }
 
     fun voteReply(queryId: Int, status: Int) {

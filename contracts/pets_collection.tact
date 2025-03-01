@@ -1,7 +1,6 @@
 import "@stdlib/deploy";
 import "./imports/utils.fc";
 import "./messages.tact";
-import "./exceptions.tact";
 import "./auth_item.tact";
 import "./pet_memory_nft.tact";
 import "./utils.tact";
@@ -49,15 +48,33 @@ const FieldValue: Int = sha256("value");
 
 const PetsCollectionName: String = "petsmem-v1";
 const AuthClassAName: String = "Auth Class A";
-const AuthClassBName: String = "Auth Class A";
+const AuthClassBName: String = "Auth Class B";
 
-fun encodeNameMetadataContent(name: String): Cell {
+fun encodeNftMetadataContent(name: String, data: NftMutableMetaData?): Cell {
     let dict: map<Int as uint256, Cell> = emptyMap();
+
     dict.set(FieldName, name.asMetadataCell());
+
+    if (data != null) {
+        let mdata: NftMutableMetaData = data!!;
+        if (mdata.uri != null) {
+            dict.set(FieldUri, mdata.uri!!.asMetadataCell());
+        }
+        if (mdata.description != null) {
+            dict.set(FieldDescription, mdata.description!!.asMetadataCell());
+        }
+        if (mdata.image != null) {
+            dict.set(FieldImage, mdata.image!!.asMetadataCell());
+        }
+        if (mdata.imageData != null) {
+            dict.set(FieldImageData, mdata.imageData!!);
+        }
+    }
+
     return beginCell()
-            .storeUint(0, 8) // On-chain content layout
-            .storeMaybeRef(dict.asCell()!!)
-            .endCell();    
+        .storeUint(0, 8) // On-chain content layout
+        .storeMaybeRef(dict.asCell()!!)
+        .endCell();
 }
 
 contract PetsCollection {
@@ -84,9 +101,9 @@ contract PetsCollection {
     // - Vote settings
     voteDurationHours: Int as uint8;
     //
-    data: Cell?;
-    dataClassA: Cell?;
-    dataClassB: Cell?;
+    data: NftMutableMetaData?;
+    dataClassA: NftMutableMetaData?;
+    dataClassB: NftMutableMetaData?;
 
     init() {
         //
@@ -231,7 +248,7 @@ contract PetsCollection {
     get fun get_collection_data(): CollectionData {
         return CollectionData{
             nextItemIndex: self.nftIndexSeq,
-            collectionContent: (self.data != null) ? self.data!! : encodeNameMetadataContent(PetsCollectionName),
+            collectionContent: encodeNftMetadataContent(PetsCollectionName, self.data),
             ownerAddress: newAddress(0, 0)
         }
     }
@@ -244,19 +261,15 @@ contract PetsCollection {
     get fun get_nft_content(index: Int, individualContent: Cell): Cell {
         if (index >> 40 != 0) {
             // Auth Item
-            let isClassB: Bool = ((index >> 40) & 1) == 1;
-            let data: Cell? = isClassB ? self.dataClassB : self.dataClassA;
-            if (data != null) {
-                return data!!;
+            if (((index >> 40) & 1) == 1) {
+                return encodeNftMetadataContent(AuthClassBName, self.dataClassB);
             }
             else {
-                return encodeNameMetadataContent(isClassB ? AuthClassBName : AuthClassAName);
+                return encodeNftMetadataContent(AuthClassAName, self.dataClassA);
             }
         }
 
         // PetMemoryNFT
-        let dict: map<Int as uint256, Cell> = emptyMap();
-
         let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent);
 
         let nameStr: StringBuilder = beginString()
@@ -282,25 +295,7 @@ contract PetsCollection {
                 .concat(")");
         }
     
-        let mdata: NftMutableMetaData = content.data;
-        if (mdata.uri != null) {
-            dict.set(FieldUri, mdata.uri!!.asMetadataCell());
-        }
-        dict.set(FieldName, nameStr.toString().asMetadataCell());
-        if (mdata.description != null) {
-            dict.set(FieldDescription, mdata.description!!.asMetadataCell());
-        }
-        if (mdata.image != null) {
-            dict.set(FieldImage, mdata.image!!.asMetadataCell());
-        }
-        if (mdata.imageData != null) {
-            dict.set(FieldImageData, mdata.imageData!!);
-        }
-
-        return beginCell()
-            .storeUint(0, 8) // On-chain content layout
-            .storeMaybeRef(dict.asCell()!!)
-            .endCell();
+        return encodeNftMetadataContent(nameStr.toString(), content.data);
     }
 
     get fun info(): Info {
@@ -417,8 +412,7 @@ contract PetsCollection {
     }
 
     fun execUpdateSettings(msg: UpdateSettings) {
-        require(msg.feeStorage >= MinFeeStorage, ErrorValidation);
-        require(msg.voteDurationHours >= 24, ErrorValidation);
+        require((msg.feeStorage >= MinFeeStorage) || (msg.voteDurationHours >= 24), ErrorValidation);
         self.feeStorage = msg.feeStorage;
         self.feeClassA = msg.feeClassA;
         self.feeClassB = msg.feeClassB;
