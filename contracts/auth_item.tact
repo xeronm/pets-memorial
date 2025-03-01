@@ -152,7 +152,7 @@ contract AuthItem {
         require(self.isInitialized(), ErrorValidation);
         return GetNftData {
             isInitialized: self.isInitialized(), 
-            index: ((self.index << 1) + self.isClassB) << 40,  // 40-bit offset 
+            index: ((self.index << 1) + (self.isClassB ? 1 : 0)) << 40,  // 40-bit offset 
             collectionAddress: self.collectionAddress, 
             ownerAddress: self.owner,
             individualContent: emptyCell(),

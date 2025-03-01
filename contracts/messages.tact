@@ -60,7 +60,10 @@ message(0x4219f222) UpdateSettings {
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
-    data: NftMutableMetaData?;
+    voteDurationHours: Int as uint8;
+    data: Cell?;
+    dataClassA: Cell?;
+    dataClassB: Cell?;
 }
 
 message(0x9d9f8663) TransferAuthItems {

@@ -68,28 +68,28 @@ const MaxGasConsumption = {
     //
     Deposit:            toNano('0.0023'),
     //
-    Deploy:             toNano('0.0154'),
-    DeployInForwardFee: toNano('0.0228'),
+    Deploy:             toNano('0.0166'),
+    DeployInForwardFee: toNano('0.0242'),
     MintAuthItem:       toNano('0.0033'),
     MintAuthItemInForwardFee: toNano('0.005'),
     DeployResult:       toNano('0.0002'),
     //
     Withdraw:           toNano('0.0045'),
-    _Withdraw:          toNano('0.0093'),
+    _Withdraw:          toNano('0.0109'),
     _WithdrawReply:     toNano('0.0060'),    
     WithdrawResult:     toNano('0.0002'),
     //
     PutToVoteUpdateSettings:    toNano('0.0045'),
-    _PutToVoteUpdateSettings:   toNano('0.0086'),
+    _PutToVoteUpdateSettings:   toNano('0.0101'),
 
     PutToVoteMintAuthItem:      toNano('0.0048'),
-    _PutToVoteMintAuthItem:      toNano('0.0292'),
+    _PutToVoteMintAuthItem:      toNano('0.0314'),
 
     _PutToVoteReply:   toNano('0.0046'),
     PutToVoteResult:   toNano('0.0002'),
 
     //
-    MintPetMemoryNft:   toNano('0.0235'),
+    MintPetMemoryNft:   toNano('0.0241'),
     _MintPetMemoryNft:  toNano('0.0116'),
     _MintPetMemoryNftInForwardFee: toNano('0.009'),
     DestroyNft:         toNano('0.009'),
@@ -401,13 +401,10 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeStorage: 0x3An,
             feeClassA: 0n,
             feeClassB: 0n,
-            data: {
-                $$type: 'NftMutableMetaData',
-                description: "My Pets Memorial",
-                image: null,
-                imageData: null,
-                uri: null,
-            }
+            voteDurationHours: 24n,
+            data: null,
+            dataClassA: null,
+            dataClassB: null,
         })(msg);
         msg.endCell();
 
@@ -665,7 +662,10 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeStorage: 0x3An,
             feeClassA: 0n,
             feeClassB: 0n,
+            voteDurationHours: 24n,
             data: null,
+            dataClassA: null,
+            dataClassB: null,
         })(msg);
         msg.endCell();
 

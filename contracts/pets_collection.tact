@@ -48,6 +48,17 @@ const FieldTraitType: Int = sha256("trait_type");
 const FieldValue: Int = sha256("value");
 
 const PetsCollectionName: String = "petsmem-v1";
+const AuthClassAName: String = "Auth Class A";
+const AuthClassBName: String = "Auth Class A";
+
+fun encodeNameMetadataContent(name: String): Cell {
+    let dict: map<Int as uint256, Cell> = emptyMap();
+    dict.set(FieldName, name.asMetadataCell());
+    return beginCell()
+            .storeUint(0, 8) // On-chain content layout
+            .storeMaybeRef(dict.asCell()!!)
+            .endCell();    
+}
 
 contract PetsCollection {
     override const storageReserve: Int = ton("0.05");  // CollectionStorageReserve;
@@ -73,9 +84,9 @@ contract PetsCollection {
     // - Vote settings
     voteDurationHours: Int as uint8;
     //
-    data: NftMutableMetaData?;
-    dataClassA: NftMutableMetaData?;
-    dataClassB: NftMutableMetaData?;
+    data: Cell?;
+    dataClassA: Cell?;
+    dataClassB: Cell?;
 
     init() {
         //
@@ -220,7 +231,7 @@ contract PetsCollection {
     get fun get_collection_data(): CollectionData {
         return CollectionData{
             nextItemIndex: self.nftIndexSeq,
-            collectionContent: self.nftMetadataContent(0),
+            collectionContent: (self.data != null) ? self.data!! : encodeNameMetadataContent(PetsCollectionName),
             ownerAddress: newAddress(0, 0)
         }
     }
@@ -231,7 +242,65 @@ contract PetsCollection {
     }
 
     get fun get_nft_content(index: Int, individualContent: Cell): Cell {
-        return self.nftMetadataContent(index, individualContent);
+        if (index >> 40 != 0) {
+            // Auth Item
+            let isClassB: Bool = ((index >> 40) & 1) == 1;
+            let data: Cell? = isClassB ? self.dataClassB : self.dataClassA;
+            if (data != null) {
+                return data!!;
+            }
+            else {
+                return encodeNameMetadataContent(isClassB ? AuthClassBName : AuthClassAName);
+            }
+        }
+
+        // PetMemoryNFT
+        let dict: map<Int as uint256, Cell> = emptyMap();
+
+        let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent);
+
+        let nameStr: StringBuilder = beginString()
+            .concat(content.immData.name)
+            .concat(", ")
+            .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : enumToSpeciesName(content.immData.species));
+
+        // TODO: Add serialization depends on serialization mask each bit for each feature
+        if (content.immData.countryCode > 0) {
+            nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
+        }
+
+        if (content.immData.location != null) {
+            nameStr = nameStr.concat(", ").concat(content.immData.location!!);
+        }
+
+        if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
+            nameStr = nameStr
+                .concat(" (")
+                .concat(dateMaskToString(content.immData.birthDate))
+                .concat(" ~ ")
+                .concat(dateMaskToString(content.immData.deathDate))
+                .concat(")");
+        }
+    
+        let mdata: NftMutableMetaData = content.data;
+        if (mdata.uri != null) {
+            dict.set(FieldUri, mdata.uri!!.asMetadataCell());
+        }
+        dict.set(FieldName, nameStr.toString().asMetadataCell());
+        if (mdata.description != null) {
+            dict.set(FieldDescription, mdata.description!!.asMetadataCell());
+        }
+        if (mdata.image != null) {
+            dict.set(FieldImage, mdata.image!!.asMetadataCell());
+        }
+        if (mdata.imageData != null) {
+            dict.set(FieldImageData, mdata.imageData!!);
+        }
+
+        return beginCell()
+            .storeUint(0, 8) // On-chain content layout
+            .storeMaybeRef(dict.asCell()!!)
+            .endCell();
     }
 
     get fun info(): Info {
@@ -348,13 +417,21 @@ contract PetsCollection {
     }
 
     fun execUpdateSettings(msg: UpdateSettings) {
-        require(msg.feeStorage >= MinFeeStorage, ErrorMinimumStorageFee);
+        require(msg.feeStorage >= MinFeeStorage, ErrorValidation);
+        require(msg.voteDurationHours >= 24, ErrorValidation);
         self.feeStorage = msg.feeStorage;
         self.feeClassA = msg.feeClassA;
         self.feeClassB = msg.feeClassB;
+        self.voteDurationHours = msg.voteDurationHours;
         if (msg.data != null) {
             self.data = msg.data;
         }
+        if (msg.dataClassA != null) {
+            self.dataClassA = msg.dataClassA;
+        }        
+        if (msg.dataClassB != null) {
+            self.dataClassB = msg.dataClassB;
+        }        
     }
 
     fun execMintAuthItem(msg: MintAuthItems) {
@@ -394,73 +471,6 @@ contract PetsCollection {
                 }.toCell(),
             });
         }        
-    }
-
-    fun nftMetadataContent(index: Int, individualContent: Cell?): Cell {
-        let dict: map<Int as uint256, Cell> = emptyMap();
-
-        let data: NftMutableMetaData? = null;
-        if (index == 0) {
-            dict.set(FieldName, PetsCollectionName.asMetadataCell());
-            // PetsCollection
-            data = self.data;
-        }
-        else if (index >> 40) {
-            // AuthItem
-            dict.set(FieldName, ((index & 1) ? "Auth Class B" : "Auth Class A").asMetadataCell());
-            data = (index & 1) ? self.dataClassA : self.dataClassB;
-        } 
-        else {
-            // PetsMemoryNFT
-            let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent!!);
-
-            let nameStr: StringBuilder = beginString()
-                .concat(content.immData.name)
-                .concat(", ")
-                .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : enumToSpeciesName(content.immData.species));
-
-            // TODO: Add serialization depends on serialization mask each bit for each feature
-            if (content.immData.countryCode > 0) {
-                nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
-            }
-
-            if (content.immData.location != null) {
-                nameStr = nameStr.concat(", ").concat(content.immData.location!!);
-            }
-
-            if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
-                nameStr = nameStr
-                    .concat(" (")
-                    .concat(dateMaskToString(content.immData.birthDate))
-                    .concat(" ~ ")
-                    .concat(dateMaskToString(content.immData.deathDate))
-                    .concat(")");
-            }
-
-            dict.set(FieldName, nameStr.toString().asMetadataCell());
-            data = content.data;
-        }
-
-        if (data != null) {
-            let mdata: NftMutableMetaData = data!!;
-            if (mdata.uri != null) {
-                dict.set(FieldUri, mdata.uri!!.asMetadataCell());
-            }
-            if (mdata.description != null) {
-                dict.set(FieldDescription, mdata.description!!.asMetadataCell());
-            }
-            if (mdata.image != null) {
-                dict.set(FieldImage, mdata.image!!.asMetadataCell());
-            }
-            if (mdata.imageData != null) {
-                dict.set(FieldImageData, mdata.imageData!!);
-            }
-        }
-
-        return beginCell()
-                .storeUint(0, 8) // On-chain content layout
-                .storeMaybeRef(dict.asCell()!!)
-                .endCell();
     }
 
 }

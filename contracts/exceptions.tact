@@ -3,7 +3,6 @@ const ErrorValidation: String = "Validation error";
 const ErrorInsufficientFunds: String = "Insufficient funds for operation";
 const ErrorCompareState: String = "CAS: previous state mistmatch";
 const ErrorMaxAuthItemCount: String = "Maximum AuthItem count reached";
-const ErrorMinimumStorageFee: String = "storageFee: minimum value constraint violated";
 const ErrorNotAuthorized: String = "Not authorized";
 const ErrorVoteInProgress: String = "Vote already in progress";
 const ErrorVoteDuplicated: String = "Vote duplicated";
