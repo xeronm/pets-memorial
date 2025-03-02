@@ -67,7 +67,6 @@ export function makeSnakeCell(data: Buffer): Cell {
 }
 
 export function toTextCellSnake(s: string | Buffer): Cell {
-  console.log(typeof s);
   let data = (s instanceof Buffer) ? s : Buffer.from(s, 'utf8');
   data = Buffer.concat([Buffer.from([CONTENT_DATA_FORMAT_SNAKE]), data]);
   return makeSnakeCell(data);
@@ -79,6 +78,17 @@ export function encodeOffChainContent(content: string) {
   data = Buffer.concat([offChainPrefix, data]);
   return makeSnakeCell(data);
 }
+
+export function decodeOffChainContent(content: Cell) {
+  let data = flattenSnakeCell(content)
+
+  let prefix = data[0]
+  if (prefix !== OFF_CHAIN_CONTENT_PREFIX) {
+      throw new Error(`Unknown content prefix: ${prefix.toString(16)}`)
+  }
+  return data.slice(1).toString()
+}
+
 
 interface ChunkDictValue {
   content: Buffer;

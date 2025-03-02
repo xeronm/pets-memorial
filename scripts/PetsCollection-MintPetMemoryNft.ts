@@ -14,7 +14,7 @@ const nftDataImageOnChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
   image: null,
-  imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-256x256.jpg')),
+  imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg')),
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
               "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
               " out of an abandoned private house, looked at people with piercing emerald eyes," +
@@ -34,7 +34,7 @@ const nftDataImageOffChain: NftMutableMetaData = {
   description: "On-chain overriden description"
 }
 
-const nftData = nftDataImageOffChain;
+const nftData = nftDataImageOnChain;
 
 const nftImmData: PetMemoryNftImmutableData = {
   $$type: 'PetMemoryNftImmutableData',

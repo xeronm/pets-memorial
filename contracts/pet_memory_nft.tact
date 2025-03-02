@@ -7,7 +7,7 @@ contract PetMemoryNft {
     override const storageReserve: Int = ton("0.01");
 
     collectionAddress: Address;
-    index: Int as uint40;
+    index: Int as uint40;    
     owner: Address?;
     immData: PetMemoryNftImmutableData?;
     data: NftMutableMetaData?;
@@ -23,7 +23,7 @@ contract PetMemoryNft {
     }
 
     receive(msg: Transfer){
-        require(sender() == self.collectionAddress, ErrorNotAuthorized);
+        require(sender() == self.owner!!, ErrorNotAuthorized);
         let storageReserve: Int = self.storageReserve;      
         if (!self.isInitialized()) {
             let init = PetMemoryNftInit.fromCell(msg.customPayload);
@@ -31,45 +31,37 @@ contract PetMemoryNft {
             self.data = init.data;
             storageReserve = unpackQint(init.storageReserve);
         }
-        require(self.data != null, ErrorValidation);
-        
-        let ctx = context();
-        let fwdFee: Int = ctx.readForwardFee();        
-        let restAmount: Int = myBalance() - storageReserve;
-        if (msg.forwardAmount > 0) {
-            require(self.owner != null, ErrorValidation);
-            restAmount -= msg.forwardAmount + fwdFee;
-        }
-        if (msg.responseDestination != null) {
-            restAmount -= fwdFee;
-        }
-        require(restAmount >= 0, ErrorInsufficientFunds);
+        require(self.isInitialized(), ErrorValidation);
 
-        if (msg.forwardAmount > 0) {
-            send(SendParameters {
-                to: msg.newOwner,
-                value: msg.forwardAmount,
-                mode: SendPayGasSeparately,
-                bounce: true,
-                body: OwnershipAssigned{
-                    queryId: msg.queryId,
-                    prevOwner: self.owner!!,
-                    forwardPayload: msg.forwardPayload
-                }.toCell()
-            });
+        self.owner = msg.newOwner;        
+        let needResp: Bool = msg.responseDestination != null && msg.responseDestination != newAddress(0, 0);
+        if (msg.forwardAmount > 0 || needResp) {
+            nativeReserve(storageReserve, 0);
+            if (msg.forwardAmount > 0) {
+                send(SendParameters {
+                    to: msg.newOwner,
+                    value: msg.forwardAmount,
+                    mode: SendPayGasSeparately,
+                    bounce: true,
+                    body: OwnershipAssigned{
+                        queryId: msg.queryId,
+                        prevOwner: self.owner!!,
+                        forwardPayload: msg.forwardPayload
+                    }.toCell()
+                });
+            }
+            if (needResp) {
+                send(SendParameters {
+                    to: msg.responseDestination!!,
+                    value: 0,
+                    mode: SendPayGasSeparately + SendRemainingBalance,
+                    bounce: true,
+                    body: Excesses{
+                        queryId: msg.queryId
+                    }.toCell()
+                }); 
+            }        
         }
-        if (msg.responseDestination != null && msg.responseDestination != newAddress(0, 0)) {
-            send(SendParameters {
-                to: msg.responseDestination!!,
-                value: restAmount,
-                mode: SendPayGasSeparately,
-                bounce: true,
-                body: Excesses{
-                    queryId: msg.queryId
-                }.toCell()
-            }); 
-        }
-        self.owner = msg.newOwner;
     }
 
     receive(msg: GetStaticData) {
@@ -121,8 +113,8 @@ contract PetMemoryNft {
         };
     }
 
-    fun isInitialized(): Bool {
-        return (self.immData != null) && (self.data != null);
+    inline fun isInitialized(): Bool {
+        return self.data != null;
     }
 
 }

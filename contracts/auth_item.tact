@@ -167,7 +167,7 @@ contract AuthItem {
         require(sender() == self.collectionAddress, ErrorNotAuthorized);
     }
 
-    fun isInitialized(): Bool {
+    inline fun isInitialized(): Bool {
         return (self.owner != self.collectionAddress);
     }
 

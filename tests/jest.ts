@@ -23,6 +23,41 @@ export function transactionStringify(txs: BlockchainTransaction[]): string {
     });
 }
 
+export interface TxAmoutFlow {
+    outAmount: bigint,
+    inAmount: bigint,
+    totalFees: bigint,
+    storageFees: bigint,
+}
+
+export function transactionAmountFlow(subject: BlockchainTransaction[], address: Address): TxAmoutFlow  {
+    // TODO: Need check graph traversal, and count only edges `from` -> `to`.
+    const flow: TxAmoutFlow = {
+        outAmount: 0n,
+        inAmount: 0n,
+        totalFees: 0n,
+        storageFees: 0n,
+    };
+    let i = 0;
+    for (const txRaw of subject) {
+        const tx = flattenTransaction(txRaw);
+        flow.totalFees += tx.totalFees ?? 0n;
+        if (tx.from?.toString() === address.toString()) {
+            flow.outAmount += tx.value ?? 0n;
+        }
+        if (tx.to?.toString() === address.toString()) {
+            flow.inAmount += tx.value ?? 0n;
+        }        
+
+        if ((i > 0) && (txRaw.description.type === 'generic')) {
+            flow.storageFees += txRaw.description.storagePhase?.storageFeesCollected ?? 0n
+        }
+        i += 1;
+    }
+
+    return flow;
+}
+
 function toHaveTransactionSeq(subject: BlockchainTransaction[], cmp: TransactionDesc[]) {
     let i = 0;
     let pass = true;

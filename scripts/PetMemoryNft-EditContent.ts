@@ -1,9 +1,19 @@
 import { Address, toNano } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
+import { NftMutableMetaData } from '../wrappers/PetsCollection';
 import { PetMemoryNft } from '../wrappers/PetMemoryNft';
 const fs = require('node:fs');
 
 
+const nftDataImageOffChain: NftMutableMetaData = {
+  $$type: 'NftMutableMetaData',
+  uri: null,
+  image: 'https://upload.wikimedia.org/wikipedia/en/0/0c/Linkin_Park_Meteora_Album_Cover.jpg',
+  imageData: null,
+  description: "On-chain overriden description"
+}
+
+const nftData = nftDataImageOffChain;
 
 export async function run(provider: NetworkProvider, args: string[]) {
   const ui = provider.ui();
@@ -22,18 +32,10 @@ export async function run(provider: NetworkProvider, args: string[]) {
     {
       value: toNano('0.01'),
     },
-    'Destroy'  
+    {
+      $$type: 'EditContent',
+      queryId: 0n,
+      data: nftData
+    }
   );
-
-  let isDeployed = await provider.isContractDeployed(address);
-  let attempt = 1;
-  while (isDeployed) {
-    ui.setActionPrompt(`Attempt ${attempt}`);
-    await sleep(3000);
-    isDeployed = await provider.isContractDeployed(address);
-    attempt++;
-  }
-
-  ui.clearActionPrompt();
-  ui.write('Destroyed successfully!');    
 }

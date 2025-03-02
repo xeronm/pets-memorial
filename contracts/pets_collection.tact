@@ -35,7 +35,7 @@ fun nextState(): Int {
 }
 
 const MaxAuthItemIndex: Int = 15;
-const MinVoteDurationMinutes: Int = 1440;
+const MinVoteDurationHours: Int = 24;
 
 const FieldUri: Int = sha256("uri");
 const FieldName: Int = sha256("name");
@@ -46,9 +46,9 @@ const FieldAttributes: Int = sha256("attributes");
 const FieldTraitType: Int = sha256("trait_type");
 const FieldValue: Int = sha256("value");
 
-const PetsCollectionName: String = "petsmem-v1";
-const AuthClassAName: String = "Auth Class A";
-const AuthClassBName: String = "Auth Class B";
+const PetsCollectionName: String = "Pets Memorial";
+const AuthClassAName: String = "Class A";
+const AuthClassBName: String = "Class B";
 
 fun encodeNftMetadataContent(name: String, data: NftMutableMetaData?): Cell {
     let dict: map<Int as uint256, Cell> = emptyMap();
@@ -122,7 +122,7 @@ contract PetsCollection {
         self.balanceWithdrawn = 0;
         self.balanceClassB = 0;
         //
-        self.voteDurationHours = 24;
+        self.voteDurationHours = MinVoteDurationHours;
     }
 
     receive() {        
@@ -260,12 +260,13 @@ contract PetsCollection {
 
     get fun get_nft_content(index: Int, individualContent: Cell): Cell {
         if (index >> 40 != 0) {
+            let nameStr: StringBuilder = beginString().concat(PetsCollectionName).concat(" - ");
             // Auth Item
             if (((index >> 40) & 1) == 1) {
-                return encodeNftMetadataContent(AuthClassBName, self.dataClassB);
+                return encodeNftMetadataContent(nameStr.concat(AuthClassBName).toString(), self.dataClassA);
             }
             else {
-                return encodeNftMetadataContent(AuthClassAName, self.dataClassA);
+                return encodeNftMetadataContent(nameStr.concat(AuthClassAName).toString(), self.dataClassB);
             }
         }
 
@@ -412,7 +413,7 @@ contract PetsCollection {
     }
 
     fun execUpdateSettings(msg: UpdateSettings) {
-        require((msg.feeStorage >= MinFeeStorage) || (msg.voteDurationHours >= 24), ErrorValidation);
+        require((msg.feeStorage >= MinFeeStorage) || (msg.voteDurationHours >= MinVoteDurationHours), ErrorValidation);
         self.feeStorage = msg.feeStorage;
         self.feeClassA = msg.feeClassA;
         self.feeClassB = msg.feeClassB;
