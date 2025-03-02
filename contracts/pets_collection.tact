@@ -259,14 +259,16 @@ contract PetsCollection {
     }
 
     get fun get_nft_content(index: Int, individualContent: Cell): Cell {
-        if (index >> 40 != 0) {
+        if (index == 0) {
+            let content: AuthItemContent = AuthItemContent.fromCell(individualContent);
+
             let nameStr: StringBuilder = beginString().concat(PetsCollectionName).concat(" - ");
             // Auth Item
-            if (((index >> 40) & 1) == 1) {
-                return encodeNftMetadataContent(nameStr.concat(AuthClassBName).toString(), self.dataClassA);
+            if (content.isClassB) {
+                return encodeNftMetadataContent(nameStr.concat(AuthClassBName).toString(), self.dataClassB);
             }
             else {
-                return encodeNftMetadataContent(nameStr.concat(AuthClassAName).toString(), self.dataClassB);
+                return encodeNftMetadataContent(nameStr.concat(AuthClassAName).toString(), self.dataClassA);
             }
         }
 

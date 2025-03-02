@@ -121,6 +121,11 @@ message VoteExecuteResult {
 }
 
 // AuthItem Interface
+struct AuthItemContent {
+    index: Int;
+    isClassB: Bool;
+}
+
 message AuthItemWithdraw {
     queryId: Int as uint64;
 }

@@ -151,10 +151,13 @@ contract AuthItem {
     get fun get_nft_data(): GetNftData {
         return GetNftData {
             isInitialized: self.isInitialized(), 
-            index: ((self.index << 1) + (self.isClassB ? 1 : 0)) << 40,  // 40-bit offset 
+            index: 0,
             collectionAddress: self.collectionAddress, 
             ownerAddress: self.owner,
-            individualContent: emptyCell(),
+            individualContent: AuthItemContent{
+                index: self.index,
+                isClassB: self.isClassB,
+            }.toCell(),
         };
     }
 
