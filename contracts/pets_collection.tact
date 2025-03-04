@@ -48,33 +48,40 @@ const FieldValue: Int = sha256("value");
 
 const PetsCollectionName: String = "Pets Memorial";
 const AuthClassAName: String = "Class A";
+const AuthClassADescription: String = "Auth Governance Token";
 const AuthClassBName: String = "Class B";
+const AuthClassBDescription: String = "Auth Non-governance Token";
 
-fun encodeNftMetadataContent(name: String, data: NftMutableMetaData?): Cell {
+fun encodeNftMetadataContent(name: String, uri: String?, description: String?, image: String?, imageData: Cell?): Cell {
     let dict: map<Int as uint256, Cell> = emptyMap();
 
     dict.set(FieldName, name.asMetadataCell());
 
-    if (data != null) {
-        let mdata: NftMutableMetaData = data!!;
-        if (mdata.uri != null) {
-            dict.set(FieldUri, mdata.uri!!.asMetadataCell());
-        }
-        if (mdata.description != null) {
-            dict.set(FieldDescription, mdata.description!!.asMetadataCell());
-        }
-        if (mdata.image != null) {
-            dict.set(FieldImage, mdata.image!!.asMetadataCell());
-        }
-        if (mdata.imageData != null) {
-            dict.set(FieldImageData, mdata.imageData!!);
-        }
+    if (uri != null) {
+        dict.set(FieldUri, uri!!.asMetadataCell());
+    }
+    if (description != null) {
+        dict.set(FieldDescription, description!!.asMetadataCell());
+    }
+    if (image != null) {
+        dict.set(FieldImage, image!!.asMetadataCell());
+    }
+    if (imageData != null) {
+        dict.set(FieldImageData, imageData!!);
     }
 
     return beginCell()
         .storeUint(0, 8) // On-chain content layout
         .storeMaybeRef(dict.asCell()!!)
         .endCell();
+}
+
+// deployPetsCollectionFlow: { amount: '0.1209616', totalFees: '0.066434053' },
+// mintPetMemoryNftFlow: { amount: '0.153100029', totalFees: '0.041005113' },
+// withdrawAuthItemFlow: { amount: '0.01225', totalFees: '0.022287989' },
+
+fun makeUri(prefixUri: String, path: String): String {
+    return beginString().concat(prefixUri).concat(path).toString();
 }
 
 contract PetsCollection {
@@ -101,11 +108,10 @@ contract PetsCollection {
     // - Vote settings
     voteDurationHours: Int as uint8;
     //
-    data: NftMutableMetaData?;
-    dataClassA: NftMutableMetaData?;
-    dataClassB: NftMutableMetaData?;
+    prefixUri: String;
+    description: String;
 
-    init() {
+    init(prefixUri: String, description: String) {
         //
         self.votesFor = 0;
         self.votesAgainst = 0;
@@ -123,6 +129,8 @@ contract PetsCollection {
         self.balanceClassB = 0;
         //
         self.voteDurationHours = MinVoteDurationHours;
+        self.prefixUri = prefixUri;
+        self.description = description;
     }
 
     receive() {        
@@ -246,9 +254,17 @@ contract PetsCollection {
     }
 
     get fun get_collection_data(): CollectionData {
+        let content: Cell = encodeNftMetadataContent(
+            PetsCollectionName, 
+            null,
+            self.description,
+            makeUri(self.prefixUri, "collection.png"),
+            null,            
+        );
+
         return CollectionData{
             nextItemIndex: self.nftIndexSeq,
-            collectionContent: encodeNftMetadataContent(PetsCollectionName, self.data),
+            collectionContent: content,
             ownerAddress: newAddress(0, 0)
         }
     }
@@ -259,46 +275,66 @@ contract PetsCollection {
     }
 
     get fun get_nft_content(index: Int, individualContent: Cell): Cell {
+        let nameStr: StringBuilder = beginString();
+        let description: String? = null;
+        let uri: String? = null;
+        let image: String? = null;
+        let imageData: Cell? = null;
+
         if (index == 0) {
             let content: AuthItemContent = AuthItemContent.fromCell(individualContent);
 
-            let nameStr: StringBuilder = beginString().concat(PetsCollectionName).concat(" - ");
+            nameStr = nameStr.concat(PetsCollectionName).concat(" - ");
             // Auth Item
             if (content.isClassB) {
-                return encodeNftMetadataContent(nameStr.concat(AuthClassBName).toString(), self.dataClassB);
+                nameStr = nameStr.concat(AuthClassBName);
+                description = AuthClassBDescription;
+                image = makeUri(self.prefixUri, "classB.png");
             }
             else {
-                return encodeNftMetadataContent(nameStr.concat(AuthClassAName).toString(), self.dataClassA);
+                nameStr = nameStr.concat(AuthClassAName);
+                description = AuthClassADescription;
+                image = makeUri(self.prefixUri, "classA.png");
             }
         }
+        else {
+            // PetMemoryNFT
+            let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent);
 
-        // PetMemoryNFT
-        let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent);
+            nameStr = nameStr.concat(content.immData.name)
+                .concat(", ")
+                .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : enumToSpeciesName(content.immData.species));
 
-        let nameStr: StringBuilder = beginString()
-            .concat(content.immData.name)
-            .concat(", ")
-            .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : enumToSpeciesName(content.immData.species));
+            // TODO: Add serialization depends on serialization mask each bit for each feature
+            if (content.immData.countryCode > 0) {
+                nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
+            }
 
-        // TODO: Add serialization depends on serialization mask each bit for each feature
-        if (content.immData.countryCode > 0) {
-            nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
+            if (content.immData.location != null) {
+                nameStr = nameStr.concat(", ").concat(content.immData.location!!);
+            }
+
+            if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
+                nameStr = nameStr.concat(" (")
+                    .concat(dateMaskToString(content.immData.birthDate))
+                    .concat(" ~ ")
+                    .concat(dateMaskToString(content.immData.deathDate))
+                    .concat(")");
+            }
+
+            uri = content.data.uri;
+            description = content.data.description;
+            image = content.data.image;
+            imageData = content.data.imageData;
         }
 
-        if (content.immData.location != null) {
-            nameStr = nameStr.concat(", ").concat(content.immData.location!!);
-        }
-
-        if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
-            nameStr = nameStr
-                .concat(" (")
-                .concat(dateMaskToString(content.immData.birthDate))
-                .concat(" ~ ")
-                .concat(dateMaskToString(content.immData.deathDate))
-                .concat(")");
-        }
     
-        return encodeNftMetadataContent(nameStr.toString(), content.data);
+        return encodeNftMetadataContent(
+            nameStr.toString(), 
+            uri,
+            description,
+            image,
+            imageData);
     }
 
     get fun info(): Info {
@@ -420,14 +456,11 @@ contract PetsCollection {
         self.feeClassA = msg.feeClassA;
         self.feeClassB = msg.feeClassB;
         self.voteDurationHours = msg.voteDurationHours;
-        if (msg.data != null) {
-            self.data = msg.data;
+        if (msg.prefixUri != null) {
+            self.prefixUri = msg.prefixUri!!;
         }
-        if (msg.dataClassA != null) {
-            self.dataClassA = msg.dataClassA;
-        }        
-        if (msg.dataClassB != null) {
-            self.dataClassB = msg.dataClassB;
+        if (msg.description != null) {
+            self.description = msg.description!!;
         }        
     }
 

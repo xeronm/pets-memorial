@@ -3,7 +3,7 @@ import { PetsCollection } from '../wrappers/PetsCollection';
 import { NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
-    const petsCollection = provider.open(await PetsCollection.fromInit());
+    const petsCollection = provider.open(await PetsCollection.fromInit(CollectionPrefixUri, CollectionDescription));
 
     await petsCollection.send(
         provider.sender(),

@@ -146,6 +146,9 @@ const MinTransactionTons = {
     },
 }
 
+const CollectionPrefixUri = 'https://github.com/xeronm/pm-assets/blob/main/';
+const CollectionDescription = 'TestNet Pets Memorial';
+
 function dumpTransactions(txs: BlockchainTransaction[]) {
     fs.writeFileSync('./transactions.json', transactionStringify(txs)); 
 }
@@ -198,7 +201,7 @@ describe('PetsCollection Deploy', () => {
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(CollectionPrefixUri, CollectionDescription));
 
         deployer = await blockchain.treasury('deployer');
     });
@@ -219,6 +222,9 @@ describe('PetsCollection Deploy', () => {
 
         console.log('Deploy transaction details:');
         printTransactionFees(deployResult.transactions);
+
+        const flow = transactionAmountFlow(deployResult.transactions, deployer.address);
+        resultReport.deployPetsCollectionFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
 
         // 1. Root Transaction
         expect(deployResult.transactions).toHaveTransaction({
@@ -289,6 +295,8 @@ describe('PetsCollection Deploy', () => {
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
             name: 'Pets Memorial',
+            description: CollectionDescription,
+            image: "https://github.com/xeronm/pm-assets/blob/main/collection.png"
         });
 
         // 7. AuthItem get_nft_data()
@@ -300,6 +308,8 @@ describe('PetsCollection Deploy', () => {
         const attributes2 = await decodeNftMetadata(nftContent);
         expect(attributes2).toStrictEqual({
             name: 'Pets Memorial - Class A',
+            description: 'Auth Governance Token',
+            image: 'https://github.com/xeronm/pm-assets/blob/main/classA.png',
         });
     });
         
@@ -345,7 +355,7 @@ describe('PetsCollection AuthItem (Single)', () => {
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(CollectionPrefixUri, CollectionDescription));
 
         deployer = await blockchain.treasury('deployer');
 
@@ -452,9 +462,8 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeClassA: 0n,
             feeClassB: 0n,
             voteDurationHours: 24n,
-            data: null,
-            dataClassA: null,
-            dataClassB: null,
+            prefixUri: null,
+            description: null,
         })(msg);
         msg.endCell();
 
@@ -716,27 +725,8 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeClassA: 0n,
             feeClassB: 0n,
             voteDurationHours: 24n,
-            data: {
-                $$type: 'NftMutableMetaData',
-                description: "My Pets Memorial",
-                image: null,
-                imageData: null,
-                uri: null,
-            },
-            dataClassA: {
-                $$type: 'NftMutableMetaData',
-                description: "Governance Token",
-                image: null,
-                imageData: null,
-                uri: null,
-            },
-            dataClassB: {
-                $$type: 'NftMutableMetaData',
-                description: "Stars Funding Token",
-                image: null,
-                imageData: null,
-                uri: null,
-            },
+            prefixUri: CollectionPrefixUri,
+            description: 'Updated description...',
         })(msg);
         msg.endCell();
 
@@ -968,7 +958,7 @@ describe('PetsCollection AuthItem (Multiple: PutToVote->TransferAuthItem)', () =
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(CollectionPrefixUri, CollectionDescription));
 
         deployer = await blockchain.treasury('deployer');
 
@@ -1307,7 +1297,7 @@ describe('PetsCollection PetMemoryNft', () => {
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(CollectionPrefixUri, CollectionDescription));
 
         deployer = await blockchain.treasury('deployer');
 
