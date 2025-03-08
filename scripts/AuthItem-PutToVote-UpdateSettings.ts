@@ -5,7 +5,7 @@ import {
   storeUpdateSettings,
   PetsCollection,
 } from '../wrappers/PetsCollection';
-import { toTextCellSnake } from '../utils/nftContent';
+
 
 const fs = require('node:fs');
 
@@ -13,31 +13,14 @@ const fs = require('node:fs');
 const UpdateSettings = beginCell();
 storeUpdateSettings({
     $$type: 'UpdateSettings',
-    feeStorage: 0x3An,
+    feeStorage: 0x39n,
     feeClassA: 0n,
     feeClassB: 0n,
     voteDurationHours: 24n,
-    data: {
-        $$type: 'NftMutableMetaData',
-        description: "TestNet Pets Memorial Collection",
-        image: null,
-        imageData: toTextCellSnake(fs.readFileSync('./assets/images/pets-onchain-128x128.jpg')),
-        uri: null,
-    },
-    dataClassA: {
-        $$type: 'NftMutableMetaData',
-        description: "Governance Token",
-        image: null,
-        imageData: null,
-        uri: null,
-    },
-    dataClassB: {
-        $$type: 'NftMutableMetaData',
-        description: "Non-Governance charity Token",
-        image: null,
-        imageData: null,
-        uri: null,
-    }})(UpdateSettings);
+    prefixUri: null,
+    // prefixUri: 'https://muratov.xyz/petsmem/images/'
+    // prefixUri: 'tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/'
+  })(UpdateSettings);
 UpdateSettings.endCell();
 
         

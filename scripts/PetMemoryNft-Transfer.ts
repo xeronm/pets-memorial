@@ -42,7 +42,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   let nftData = await nft.getGetNftData();
   let attempt = 1;
-  while (nftData.ownerAddress !== newOwner) {
+  while (!nftData.ownerAddress.equals(newOwner)) {
     ui.setActionPrompt(`Attempt ${attempt}`);
     await sleep(3000);
     nftData = await nft.getGetNftData();

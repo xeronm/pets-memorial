@@ -46,11 +46,23 @@ const FieldAttributes: Int = sha256("attributes");
 const FieldTraitType: Int = sha256("trait_type");
 const FieldValue: Int = sha256("value");
 
-const PetsCollectionName: String = "Pets Memorial";
+const PetsCollectionName: String = "Test Collection";
+const PetsCollectionDescription: String = "Test Collection Description";
+const AuthClassADescription: String = "Class A Token";
+const AuthClassBDescription: String = "Class B Token";
+
+// const PetsCollectionName: String = "Pets Memorial";
+// const PetsCollectionDescription: String = "TestNet Pets Memorial";
+// const AuthClassADescription: String = "Auth Governance Token";
+// const AuthClassBDescription: String = "Auth Non-governance Token";
+
+const PetsCollectionImage: String = "collection.png";
 const AuthClassAName: String = "Class A";
-const AuthClassADescription: String = "Auth Governance Token";
+const AuthClassAImage: String = "classA.png";
 const AuthClassBName: String = "Class B";
-const AuthClassBDescription: String = "Auth Non-governance Token";
+const AuthClassBImage: String = "classB.png";
+const ImageCat: String = "cat.png";
+const ImageDog: String = "dog.png";
 
 fun encodeNftMetadataContent(name: String, uri: String?, description: String?, image: String?, imageData: Cell?): Cell {
     let dict: map<Int as uint256, Cell> = emptyMap();
@@ -75,10 +87,6 @@ fun encodeNftMetadataContent(name: String, uri: String?, description: String?, i
         .storeMaybeRef(dict.asCell()!!)
         .endCell();
 }
-
-// deployPetsCollectionFlow: { amount: '0.1209616', totalFees: '0.066434053' },
-// mintPetMemoryNftFlow: { amount: '0.153100029', totalFees: '0.041005113' },
-// withdrawAuthItemFlow: { amount: '0.01225', totalFees: '0.022287989' },
 
 fun makeUri(prefixUri: String, path: String): String {
     return beginString().concat(prefixUri).concat(path).toString();
@@ -109,9 +117,8 @@ contract PetsCollection {
     voteDurationHours: Int as uint8;
     //
     prefixUri: String;
-    description: String;
 
-    init(prefixUri: String, description: String) {
+    init(prefixUri: String) {
         //
         self.votesFor = 0;
         self.votesAgainst = 0;
@@ -129,8 +136,8 @@ contract PetsCollection {
         self.balanceClassB = 0;
         //
         self.voteDurationHours = MinVoteDurationHours;
+        //
         self.prefixUri = prefixUri;
-        self.description = description;
     }
 
     receive() {        
@@ -257,8 +264,8 @@ contract PetsCollection {
         let content: Cell = encodeNftMetadataContent(
             PetsCollectionName, 
             null,
-            self.description,
-            makeUri(self.prefixUri, "collection.png"),
+            PetsCollectionDescription,
+            makeUri(self.prefixUri, PetsCollectionImage),
             null,            
         );
 
@@ -270,6 +277,10 @@ contract PetsCollection {
     }
 
     get fun get_nft_address_by_index(index: Int): Address {
+        if ((index >> 40) > 0) {
+            let isClassB: Bool = ((index >> 40) & 1) == 1;
+            return self.calcAuthItemAddress(index >> 41, isClassB);
+        }                    
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), index);
         return contractAddress(nftInit);        
     }
@@ -281,20 +292,20 @@ contract PetsCollection {
         let image: String? = null;
         let imageData: Cell? = null;
 
-        if (index == 0) {
-            let content: AuthItemContent = AuthItemContent.fromCell(individualContent);
+        if ((index >> 40) > 0) {
+            let isClassB: Bool = ((index >> 40) & 1) == 1;
 
             nameStr = nameStr.concat(PetsCollectionName).concat(" - ");
             // Auth Item
-            if (content.isClassB) {
+            if (isClassB) {
                 nameStr = nameStr.concat(AuthClassBName);
                 description = AuthClassBDescription;
-                image = makeUri(self.prefixUri, "classB.png");
+                image = makeUri(self.prefixUri, AuthClassBImage);
             }
             else {
                 nameStr = nameStr.concat(AuthClassAName);
                 description = AuthClassADescription;
-                image = makeUri(self.prefixUri, "classA.png");
+                image = makeUri(self.prefixUri, AuthClassAImage);
             }
         }
         else {
@@ -324,8 +335,17 @@ contract PetsCollection {
 
             uri = content.data.uri;
             description = content.data.description;
+            if (description == null) {
+                description = PetsCollectionName;
+            }
             image = content.data.image;
             imageData = content.data.imageData;
+            if (image == null && imageData == null) {
+                image = makeUri(self.prefixUri, 
+                    content.immData.species == 1 ? ImageDog : 
+                        (content.immData.species == 2 ? ImageCat : PetsCollectionImage));
+            }
+
         }
 
     
@@ -459,9 +479,6 @@ contract PetsCollection {
         if (msg.prefixUri != null) {
             self.prefixUri = msg.prefixUri!!;
         }
-        if (msg.description != null) {
-            self.description = msg.description!!;
-        }        
     }
 
     fun execMintAuthItem(msg: MintAuthItems) {
