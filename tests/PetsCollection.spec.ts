@@ -68,29 +68,29 @@ const MaxGasConsumption = {
     //
     Deposit:            toNano('0.0034'),
     //
-    Deploy:             toNano('0.0166'),
-    DeployInForwardFee: toNano('0.0237'),
-    MintAuthItem:       toNano('0.0033'),
+    Deploy:             toNano('0.0154'),
+    DeployInForwardFee: toNano('0.0226'),
+    MintAuthItem:       toNano('0.0032'),
     MintAuthItemInForwardFee: toNano('0.005'),
     DeployResult:       toNano('0.0002'),
     //
     Withdraw:           toNano('0.0045'),
-    _Withdraw:          toNano('0.0109'),
-    _WithdrawReply:     toNano('0.0061'),    
+    _Withdraw:          toNano('0.0090'),
+    _WithdrawReply:     toNano('0.0060'),    
     WithdrawResult:     toNano('0.0002'),
     //
-    PutToVoteUpdateSettings:    toNano('0.0049'),
-    _PutToVoteUpdateSettings:   toNano('0.0146'),
+    PutToVoteUpdateSettings:    toNano('0.0046'),
+    _PutToVoteUpdateSettings:   toNano('0.0085'),
 
     PutToVoteMintAuthItem:      toNano('0.0048'),
-    _PutToVoteMintAuthItem:     toNano('0.0314'),
+    _PutToVoteMintAuthItem:     toNano('0.0292'),
 
     _PutToVoteReply:   toNano('0.0045'),
     PutToVoteResult:   toNano('0.0002'),
 
     //
-    MintPetMemoryNft:               toNano('0.0243'),
-    _MintPetMemoryNft:              toNano('0.0117'),
+    MintPetMemoryNft:               toNano('0.0228'),
+    _MintPetMemoryNft:              toNano('0.0114'),
     _MintPetMemoryNftInForwardFee:  toNano('0.009'),
     DestroyPetMemoryNft:            toNano('0.009'),
     EditPetMemoryNft:               toNano('0.010'),
@@ -153,6 +153,9 @@ function dumpTransactions(txs: BlockchainTransaction[]) {
 function describe_(...args: any) {
 }
 
+const PrefixUri = "tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/";
+const PrefixUriNew = "https://raw.githubusercontent.com/xeronm/pm-assets/refs/heads/main/";
+
 async function decodeNftMetadata(cell: Cell): Promise<{[key: string]: string | Buffer}> {
     const data = cell.asSlice();
     const flag = data.loadUint(8);
@@ -198,7 +201,7 @@ describe('PetsCollection Deploy', () => {
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
 
         deployer = await blockchain.treasury('deployer');
     });
@@ -219,6 +222,9 @@ describe('PetsCollection Deploy', () => {
 
         console.log('Deploy transaction details:');
         printTransactionFees(deployResult.transactions);
+
+        const flow = transactionAmountFlow(deployResult.transactions, deployer.address);
+        resultReport.deployPetsCollectionFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
 
         // 1. Root Transaction
         expect(deployResult.transactions).toHaveTransaction({
@@ -288,7 +294,9 @@ describe('PetsCollection Deploy', () => {
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
-            name: 'Pets Memorial',
+            name: 'Test Collection',
+            description: 'Test Collection Description',
+            image: 'tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/collection.png'
         });
 
         // 7. AuthItem get_nft_data()
@@ -299,7 +307,9 @@ describe('PetsCollection Deploy', () => {
         const nftContent =  await petsCollection.getGetNftContent(nftData.index, nftData.individualContent);
         const attributes2 = await decodeNftMetadata(nftContent);
         expect(attributes2).toStrictEqual({
-            name: 'Pets Memorial - Class A',
+            name: 'Test Collection - Class A',
+            description: 'Class A Token',
+            image: 'tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/classA.png',
         });
     });
         
@@ -345,7 +355,7 @@ describe('PetsCollection AuthItem (Single)', () => {
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
 
         deployer = await blockchain.treasury('deployer');
 
@@ -452,9 +462,7 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeClassA: 0n,
             feeClassB: 0n,
             voteDurationHours: 24n,
-            data: null,
-            dataClassA: null,
-            dataClassB: null,
+            prefixUri: null,
         })(msg);
         msg.endCell();
 
@@ -716,27 +724,7 @@ describe('PetsCollection AuthItem (Single)', () => {
             feeClassA: 0n,
             feeClassB: 0n,
             voteDurationHours: 24n,
-            data: {
-                $$type: 'NftMutableMetaData',
-                description: "My Pets Memorial",
-                image: null,
-                imageData: null,
-                uri: null,
-            },
-            dataClassA: {
-                $$type: 'NftMutableMetaData',
-                description: "Governance Token",
-                image: null,
-                imageData: null,
-                uri: null,
-            },
-            dataClassB: {
-                $$type: 'NftMutableMetaData',
-                description: "Stars Funding Token",
-                image: null,
-                imageData: null,
-                uri: null,
-            },
+            prefixUri: PrefixUriNew,
         })(msg);
         msg.endCell();
 
@@ -968,7 +956,7 @@ describe('PetsCollection AuthItem (Multiple: PutToVote->TransferAuthItem)', () =
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
 
         deployer = await blockchain.treasury('deployer');
 
@@ -1307,7 +1295,7 @@ describe('PetsCollection PetMemoryNft', () => {
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit());
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
 
         deployer = await blockchain.treasury('deployer');
 
@@ -1400,7 +1388,7 @@ describe('PetsCollection PetMemoryNft', () => {
 
         const { mintNftResult: mintNftResult128, nftItem: nftItem3 } = await mintNft(0n, 0n, null, {
                 ...nftData, 
-                imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg'))
+                imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-128x128.jpg'))
             });
 
         const flow128 = transactionAmountFlow(mintNftResult128.transactions, user1.address);
@@ -1408,7 +1396,7 @@ describe('PetsCollection PetMemoryNft', () => {
 
         const { mintNftResult: mintNftResult256, nftItem: nftItem4 } = await mintNft(0n, 0n, null, {
             ...nftData, 
-            imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-onchain-256x256.jpg'))
+            imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-256x256.jpg'))
         });
 
         const flow256 = transactionAmountFlow(mintNftResult256.transactions, user1.address);
@@ -1528,7 +1516,7 @@ describe('PetsCollection PetMemoryNft', () => {
 
 
     it('get_nft_content()', async () => {
-        const imageData = fs.readFileSync('./assets/images/marcus-onchain-128x128.jpg');
+        const imageData = fs.readFileSync('./assets/images/marcus-1-onchain-128x128.jpg');
         const { nftItem } = await mintNft(0n, 0n, null, {
             ...nftData, 
             imageData: toTextCellSnake(imageData),
@@ -1585,7 +1573,7 @@ describe('PetsCollection PetMemoryNft', () => {
             const nftContent =  await petsCollection.getGetNftContent(nftData.index, nftData.individualContent);
             const attributes = await decodeNftMetadata(nftContent);
             expect(attributes.description).toBe('Overriden Description');
-            expect(attributes.image).toBeUndefined();
+            expect(attributes.image).toBe('tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/cat.png');
             expect(attributes.uri).toBeUndefined();
         }
     });    
