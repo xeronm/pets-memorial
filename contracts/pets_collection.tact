@@ -144,6 +144,7 @@ contract PetsCollection {
     }
 
     receive(msg: Deploy) {
+        require(self.authIndexSeq == 1, ErrorValidation);
         require(context().value >= CollectionDeployMinTons, ErrorInsufficientFunds);
         // deploy first AuthItem
         self.mintAuthItem(sender(), false, unpackQint(self.feeStorage));

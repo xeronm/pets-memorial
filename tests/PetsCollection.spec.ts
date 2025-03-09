@@ -383,6 +383,28 @@ describe('PetsCollection AuthItem (Single)', () => {
         authItem = blockchain.openContract(AuthItem.fromAddress(createdAccounts[1].account));        
     });
 
+
+    it('should not deploy (Second Deploy)', async () => {       
+        const deployResult2 = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MinTransactionTons.CollectionDeploy,
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            }
+        );
+
+        expect(deployResult2.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            exitCode: ExitCodes.ErrorValidation,
+        });
+    });  
+
     it('verify available withdraw balance', async () => {
         // 1. Initial balance = 0.05 TON
         const availableForWithdraw1 = await petsCollection.getAvailableForWithdraw(false, 0n);
