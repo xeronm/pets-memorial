@@ -10,7 +10,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   const address = Address.parse(args.length > 0 ? args[0] : await ui.input('PetMemoryNft address'));
   const newOwner = Address.parse(args.length > 1 ? args[1] : await ui.input('New Owner address'));
-  const isWithdraw = Boolean(args.length > 2 ? args[2] : await ui.input('Withdraw excess balance?'));
+  const isWithdraw = Boolean(args.length > 2 ? args[2] : await ui.input('Withdraw excess balance? [Y/N]'));
 
   if (!(await provider.isContractDeployed(address))) {
       ui.write(`Error: Contract at address ${address} is not deployed!`);

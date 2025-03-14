@@ -11,6 +11,7 @@ export type TransactionDesc = {
     to?: Address,
     success?: boolean,
     exitCode?: number,
+    actionResultCode?: number,
     deploy?: boolean,
 }
 
@@ -80,6 +81,10 @@ function toHaveTransactionSeq(subject: BlockchainTransaction[], cmp: Transaction
             pass = false;
             txMessage.push(`exitCode(${tx.exitCode}) != ${txDesc.exitCode};`);
         }
+        if ((txDesc.actionResultCode != undefined) && (tx.actionResultCode != txDesc.actionResultCode)) {
+            pass = false;
+            txMessage.push(`actionCode(${tx.actionResultCode}) != ${txDesc.actionResultCode};`);
+        }        
         if (tx.success != (txDesc.success ?? true)) {
             pass = false;
             txMessage.push(`success(${tx.success}) != ${txDesc.success ?? true};`);

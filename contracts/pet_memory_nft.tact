@@ -36,7 +36,7 @@ contract PetMemoryNft {
         self.owner = msg.newOwner;        
         let needResp: Bool = msg.responseDestination != null && msg.responseDestination != newAddress(0, 0);
         if (msg.forwardAmount > 0 || needResp) {
-            nativeReserve(storageReserve, 0);
+            nativeReserve(storageReserve, ReserveExact);
             if (msg.forwardAmount > 0) {
                 send(SendParameters {
                     to: msg.newOwner,

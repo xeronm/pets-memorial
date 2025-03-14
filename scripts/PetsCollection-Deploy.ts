@@ -8,7 +8,12 @@ const PrefixUri = 'https://muratov.xyz/petsmem/images/'
 export async function run(provider: NetworkProvider) {
     const ui = provider.ui();
 
-    const petsCollection = provider.open(await PetsCollection.fromInit(PrefixUri));
+    const owner = provider.sender().address;
+    if (!owner) {
+        ui.write(`Error: Invalid owner address.`);
+        return;
+    }
+    const petsCollection = provider.open(await PetsCollection.fromInit(owner));
 
     if (await provider.isContractDeployed(petsCollection.address)) {
         ui.write(`Error: Contract at address ${petsCollection.address} is already deployed!`);
@@ -27,6 +32,7 @@ export async function run(provider: NetworkProvider) {
     );
 
     await provider.waitForDeploy(petsCollection.address);
+    const info = await petsCollection.getInfo();
 
-    console.log('Info:', await petsCollection.getInfo());
+    console.log('Info: ', info);
 }
