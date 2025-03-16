@@ -92,7 +92,8 @@ contract PetsCollection {
     // - Minting data
     nftIndexSeq: Int as uint40;
     // - Balances
-    balanceWithdrawn: Int as coins;
+    balanceClassAWithdrawn: Int as coins;
+    balanceClassBWithdrawn: Int as coins;
     balanceClassB: Int as coins;
     // Mutable Settings
     // - Fees
@@ -111,7 +112,8 @@ contract PetsCollection {
         self.feeClassA = 0x3A; // 0.025 TON
         self.feeClassB = 0x3C; // 0.05 TON
         // 
-        self.balanceWithdrawn = 0;
+        self.balanceClassAWithdrawn = 0;
+        self.balanceClassBWithdrawn = 0;
         self.balanceClassB = 0;
         //
         self.prefixUri = DefaultPrefixUri;
@@ -122,15 +124,15 @@ contract PetsCollection {
 
 
     receive(msg: Deploy) {
-        require(sender() == self.owner, ErrorNotAuthorized);
-        require(self.nftIndexSeq == 0, ErrorValidation);
+        require(sender() == self.owner, "ErrorNotAuthorized");
+        require(self.nftIndexSeq == 0, "ErrorValidation");
 
         self.nftIndexSeq = 1;
         self.notify(DeployOk{queryId: msg.queryId}.toCell());
     }
 
     receive(msg: MintPetMemoryNft) {
-        require(self.nftIndexSeq > 0, ErrorValidation);
+        require(self.nftIndexSeq > 0, "ErrorValidation");
 
         let storageReserve: Int = unpackQint(self.feeStorage);
         let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
@@ -138,16 +140,18 @@ contract PetsCollection {
         let ctx = context();
         let fwdFee: Int = ctx.readForwardFee();
 
-        require(ctx.value >= storageReserve + feeClassA + feeClassB + 2*fwdFee, ErrorInsufficientFunds);
+        let remainingValue = ctx.value - (feeClassA + feeClassB + fwdFee + MintPetMemoryNftOutFwdFeeMin);
+        // All fees (storage, compute, forward) are deducted from main, Class A balance.
+        require(remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasFee, "ErrorInsufficientFunds");
 
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), self.nftIndexSeq);
-        let nftAddress: Address = contractAddress(nftInit);
+        self.nftIndexSeq += 1;
+        self.balanceClassB += feeClassB;
 
-        send(SendParameters{
-            to: nftAddress, 
-            value: ctx.value - (feeClassA + feeClassB + fwdFee), 
+        deploy(DeployParameters{
+            value: remainingValue, 
             bounce: true,
-            mode: 0,
+            mode: SendDefaultMode,
             body: Transfer{
                 queryId: msg.queryId,
                 newOwner: (msg.newOwner == null) ? sender() : msg.newOwner!!,
@@ -160,25 +164,26 @@ contract PetsCollection {
                     storageReserve: self.feeStorage,
                 }.toCell(),
             }.toCell(),
-            code: nftInit.code,
-            data: nftInit.data
+            init: nftInit
         });
-
-        self.nftIndexSeq += 1;
-        self.balanceClassB += feeClassB;
     }
 
 
     receive(msg: Withdraw) {
-        require(sender() == self.owner, ErrorNotAuthorized);
+        require(sender() == self.owner, "ErrorNotAuthorized");
         
-        let available = self.availableBalance(msg.isClassB, myBalance() - context().value);
-        require(available >= msg.amount, ErrorInsufficientFunds);
-        self.balanceWithdrawn += msg.amount;
+        let available: Int = self.availableBalance(msg.isClassB, myBalance() - context().value);
+        require(available >= msg.amount, "ErrorInsufficientFunds");
+        if (msg.isClassB) {
+            self.balanceClassBWithdrawn += msg.amount;
+        }
+        else {
+            self.balanceClassAWithdrawn += msg.amount;
+        }
 
         let needFwd: Bool = msg.forwardDestination != null && msg.forwardDestination != newAddress(0, 0);
         if (needFwd) {
-            send(SendParameters{
+            message(MessageParameters{
                 to: msg.forwardDestination!!,
                 bounce: true,
                 value: msg.amount,
@@ -190,7 +195,7 @@ contract PetsCollection {
             });
         }
 
-        send(SendParameters{
+        message(MessageParameters{
             to: sender(),
             bounce: true,
             value: needFwd ? 0 : msg.amount,
@@ -198,16 +203,16 @@ contract PetsCollection {
             body: WithdrawResult{
                 queryId: msg.queryId,
                 isClassB: msg.isClassB,
-                balanceWithdrawn: self.balanceWithdrawn,
+                balanceWithdrawn: msg.isClassB ? self.balanceClassBWithdrawn : self.balanceClassAWithdrawn,
                 customPayload: msg.customPayload,
             }.toCell()
         });
     }
 
     receive(msg: UpdateSettings) {
-        require(sender() == self.owner, ErrorNotAuthorized);
+        require(sender() == self.owner, "ErrorNotAuthorized");
 
-        require(msg.feeStorage >= MinFeeStorage && msg.feeClassA >= MinFeeClassA, ErrorValidation);
+        require(msg.feeStorage >= MinFeeStorage && msg.feeClassA >= MinFeeClassA, "ErrorValidation");
         self.feeStorage = msg.feeStorage;
         self.feeClassA = msg.feeClassA;
         self.feeClassB = msg.feeClassB;
@@ -215,17 +220,13 @@ contract PetsCollection {
             self.prefixUri = msg.prefixUri!!;
         }
 
-        self.notify(Excesses{
-            queryId: msg.queryId
-        }.toCell());   
+        cashback(sender());   
     }    
 
     receive(msg: ChangeOwner) {
-        require(sender() == self.owner, ErrorNotAuthorized);
+        require(sender() == self.owner, "ErrorNotAuthorized");
         self.owner = msg.newOwner;
-        self.notify(Excesses{
-            queryId: msg.queryId
-        }.toCell());        
+        cashback(sender());        
     }
 
 
@@ -302,6 +303,8 @@ contract PetsCollection {
 
     get fun info(): Info {
         let balance: Int = myBalance();
+        let balanceB: Int = self.balanceClassB - self.balanceClassBWithdrawn;
+
         return Info{
             //
             feeStorageTons: unpackQint(self.feeStorage),
@@ -309,14 +312,17 @@ contract PetsCollection {
             feeClassBTons: unpackQint(self.feeClassB),
             //
             balance: balance,
-            balanceClassA: self.balanceWithdrawn + balance,
-            balanceClassB: self.balanceClassB,
+            balanceClassA: balance - balanceB,
+            balanceClassB: balanceB,
         }
     }
 
     // Private Methods
-    fun availableBalance(isClassB: Bool, balance: Int): Int {
-        let amount: Int = (isClassB ? self.balanceClassB : (self.balanceWithdrawn + balance - self.balanceClassB));
+    inline fun availableBalance(isClassB: Bool, balance: Int): Int {
+        let amount: Int = self.balanceClassB - self.balanceClassBWithdrawn;
+        if (!isClassB) {
+            amount = balance - amount;
+        }
         if (amount > balance - self.storageReserve) {
             amount = balance - self.storageReserve;
         }

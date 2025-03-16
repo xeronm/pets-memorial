@@ -9,8 +9,8 @@ const NewSettings: UpdateSettings = {
   feeClassA: 0x39n,
   feeClassB: 0x39n,
   // prefixUri: null,
-  prefixUri: 'https://muratov.xyz/petsmem/images/'
-  // prefixUri: 'tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/'
+  // prefixUri: 'https://muratov.xyz/petsmem/images/'
+  prefixUri: 'tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/'
 }
 
 
@@ -26,7 +26,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   const petsCollection = provider.open(PetsCollection.fromAddress(address));
   const info1 = await petsCollection.getInfo();
-  console.log('Info after: ', info1);
+  console.log('Info before: ', info1);
 
   await petsCollection.send(
     provider.sender(), 
@@ -44,6 +44,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
     info2 = await petsCollection.getInfo();
     attempt++;
   }
-
+  
+  ui.clearActionPrompt();
   console.log('Info after: ', info2);
 }

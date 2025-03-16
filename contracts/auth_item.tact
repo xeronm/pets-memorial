@@ -23,7 +23,7 @@ contract AuthItem {
     isPendingTx: Bool?;
 
     init(collectionAddress: Address, index: Int, isClassB: Bool) {
-        require(sender() == collectionAddress, ErrorNotAuthorized);
+        require(sender() == collectionAddress, "ErrorNotAuthorized");
         self.collectionAddress = collectionAddress;
         self.owner = collectionAddress;
         self.index = index;
@@ -35,11 +35,11 @@ contract AuthItem {
     }
 
     receive(msg: AuthItemPutToVote) {
-        require(self.isClassB == false, ErrorNotAuthorized);
+        require(self.isClassB == false, "ErrorNotAuthorized");
         self.assertOwnerMethod();
 
         self.isPendingTx = true;
-        send(SendParameters{
+        message(MessageParameters{
             to: self.collectionAddress,
             bounce: true,
             value: 0,
@@ -64,7 +64,7 @@ contract AuthItem {
         require(self.voteStateId != msg.stateId, ErrorVoteDuplicated);
 
         self.isPendingTx = true;
-        send(SendParameters{
+        message(MessageParameters{
             to: self.collectionAddress,
             bounce: true,
             value: 0,
@@ -92,9 +92,9 @@ contract AuthItem {
     }    
 
     receive(msg: AuthItemWithdraw) {
-        // require(context().value >= WithdrawMinTons, ErrorInsufficientFunds);
+        // require(context().value >= WithdrawMinTons, "ErrorInsufficientFunds");
         self.assertOwnerMethod();
-        send(SendParameters{
+        message(MessageParameters{
             to: self.collectionAddress,
             bounce: true,
             value: 0,
@@ -115,7 +115,7 @@ contract AuthItem {
         self.balanceWithdrawn = msg.balanceWithdrawn;
 
         nativeReserve(unpackQint(msg.storageReserve), 0);
-        send(SendParameters{
+        message(MessageParameters{
             to: self.owner,
             bounce: true,
             value: 0,
@@ -160,11 +160,11 @@ contract AuthItem {
 
     // private methods
     fun assertOwnerMethod() {
-        require(sender() == self.owner, ErrorNotAuthorized);
+        require(sender() == self.owner, "ErrorNotAuthorized");
     }
 
     fun assertCollectionMethod() {
-        require(sender() == self.collectionAddress, ErrorNotAuthorized);
+        require(sender() == self.collectionAddress, "ErrorNotAuthorized");
     }
 
     inline fun isInitialized(): Bool {
@@ -172,7 +172,7 @@ contract AuthItem {
     }
 
     fun voteReply(queryId: Int, status: Int) {
-        send(SendParameters{
+        message(MessageParameters{
             to: self.owner,
             bounce: false,
             value: 0,

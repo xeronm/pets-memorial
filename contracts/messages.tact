@@ -1,5 +1,5 @@
-const CollectionDeployMinTons: Int = ton("0.115");  // 2x0.05[storageReserve] + 0.015[GasFees]
-const TransferAuthItemMinTons: Int = ton("0.1");
+const MintPetMemoryNftOutFwdFeeMin: Int = ton("0.008");
+const PetMemoryNftTransferGasFee: Int = ton("0.01");
 
 const MinFeeStorage: Int = 0x38; // 0.01 TON
 const MinFeeClassA: Int = 0x30; // 0.001 TON
