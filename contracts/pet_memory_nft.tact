@@ -13,7 +13,7 @@ contract PetMemoryNft {
     data: NftMutableMetaData?;
 
     init(collectionAddress: Address, index: Int) {
-        require(sender() == collectionAddress, ErrorNotAuthorized);
+        require(sender() == collectionAddress, "ErrorNotAuthorized");
         self.collectionAddress = collectionAddress;
         self.owner = collectionAddress;
         self.index = index;
@@ -23,7 +23,7 @@ contract PetMemoryNft {
     }
 
     receive(msg: Transfer){
-        require(sender() == self.owner!!, ErrorNotAuthorized);
+        require(sender() == self.owner!!, "ErrorNotAuthorized");
         let storageReserve: Int = self.storageReserve;      
         if (!self.isInitialized()) {
             let init = PetMemoryNftInit.fromCell(msg.customPayload);
@@ -31,14 +31,14 @@ contract PetMemoryNft {
             self.data = init.data;
             storageReserve = unpackQint(init.storageReserve);
         }
-        require(self.isInitialized(), ErrorValidation);
+        require(self.isInitialized(), "ErrorValidation");
 
         self.owner = msg.newOwner;        
         let needResp: Bool = msg.responseDestination != null && msg.responseDestination != newAddress(0, 0);
         if (msg.forwardAmount > 0 || needResp) {
-            nativeReserve(storageReserve, 0);
+            nativeReserve(storageReserve, ReserveExact);
             if (msg.forwardAmount > 0) {
-                send(SendParameters {
+                message(MessageParameters{
                     to: msg.newOwner,
                     value: msg.forwardAmount,
                     mode: SendPayGasSeparately,
@@ -51,7 +51,7 @@ contract PetMemoryNft {
                 });
             }
             if (needResp) {
-                send(SendParameters {
+                message(MessageParameters{
                     to: msg.responseDestination!!,
                     value: 0,
                     mode: SendPayGasSeparately + SendRemainingBalance,
@@ -65,7 +65,7 @@ contract PetMemoryNft {
     }
 
     receive(msg: GetStaticData) {
-        send(SendParameters {
+        message(MessageParameters{
             to: sender(),
             value: 0,
             mode: SendRemainingValue,
@@ -79,18 +79,16 @@ contract PetMemoryNft {
     }
 
     receive(msg: EditContent) {
-        require(sender() == self.owner, ErrorNotAuthorized);
+        require(sender() == self.owner, "ErrorNotAuthorized");
         self.data = msg.data;
 
-        self.notify(Excesses{
-            queryId: msg.queryId
-        }.toCell());
+        cashback(sender());
     }    
 
     receive("Destroy") {
-        require(sender() == self.owner, ErrorNotAuthorized);
+        require(sender() == self.owner, "ErrorNotAuthorized");
         self.owner = null;
-        send(SendParameters{
+        message(MessageParameters{
             to: sender(),
             bounce: false,
             value: 0,
@@ -100,7 +98,7 @@ contract PetMemoryNft {
     }    
 
     get fun get_nft_data(): GetNftData {
-        require(self.isInitialized(), ErrorValidation);
+        require(self.isInitialized(), "ErrorValidation");
         return GetNftData {
             isInitialized: self.isInitialized(), 
             index: self.index, 

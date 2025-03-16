@@ -1,6 +1,6 @@
 import { 
     Blockchain, SandboxContract, BlockchainTransaction,
-    SendMessageResult, TreasuryContract, printTransactionFees 
+    SendMessageResult, TreasuryContract, printTransactionFees
 } from '@ton/sandbox';
 import { toNano, fromNano, beginCell, Dictionary, Address, Cell } from '@ton/core';
 import { NFTDictValueSerializer } from '../utils/dict';
@@ -8,153 +8,74 @@ import { toTextCellSnake } from '../utils/nftContent';
 import { sha256 } from '@ton/crypto';
 import { 
     PetsCollection, 
-    loadAuthItemWithdrawResult,
-    loadUpdateSettings,
-    storeUpdateSettings,
-    storeMintAuthItems,
-    storeTransferAuthItems,
-    TransferAuthItemItem,
-    MintAuthItemItem,
     PetMemoryNftImmutableData,
     NftMutableMetaData,
 } from '../wrappers/PetsCollection';
 import '@ton/test-utils';
-import { AuthItem } from '../build/PetsCollection/tact_AuthItem';
 
 import './jest';
 const fs = require('node:fs');
-import { transactionStringify, transactionAmountFlow } from './jest';
+import { transactionStringify, transactionAmountFlow, transactionReport } from './jest';
 import { PetMemoryNft } from '../build/PetsCollection/tact_PetMemoryNft';
 
 
 const ExitCodes = {
-    ErrorValidation: 12332,
-    ErrorInsufficientFunds: 57532,
-    ErrorMaxAuthItemCount: 2432,
-    ErrorNotAuthorized: 42435,
-    ErrorVoteInProgress: 18229,
-    ErrorVoteInvalidState: 42676,
-    ErrorVoteExpired: 44322,
-    ErrorVoteDuplicated: 26719,
-    ErrorPendingTransaction: 45351,
+    ErrorNotEnoughtToncoin: 37,
+    ErrorValidation: 14516,
+    ErrorNotAuthorized: 54277,
+    ErrorInsufficientFunds: 15166,
 };
 
 
-// B1 = B0 - Tx[0].valueIn + Tx[-1].valueIn - 
-//          (Tx[0].totalFees + Tx[1].inForwardFee + Tx[-1].totalFees)
-
-const MinTransactionAmount = toNano('0.1');
-
-const MaxTonsDifference = toNano('0.001');
-
-const MaxFeeStoragePerYear = {
-    PetsCollection:     toNano('0.05'),
-    AuthItem:           toNano('0.015'),
-    MemoryNftSmall:     toNano('0.021'),
-    MemoryNftMedium:    toNano('0.027'),
-    MemoryNftBig128:    toNano('0.047'),
-    MemoryNftBig256:    toNano('0.064'),
-}
+const MinTransactionAmount = toNano('0.004'); // Deposit `totalFees`
+const MaxTransactionAmount = toNano('0.25');  // Mint Big NFT
+const MaxBalanceDifference = toNano('0.01');
 
 const StorageTonsReserve = {
-    AuthItem:           toNano('0.05'),
-    Collection:         toNano('0.05'),
-}
-
-const MaxGasConsumption = {
-    //
-    ExtMessage:         toNano('0.0025'),
-    ExtInForwardFee:    toNano('0.0003'),
-    //
-    Deposit:            toNano('0.0034'),
-    //
-    Deploy:             toNano('0.0154'),
-    DeployInForwardFee: toNano('0.0226'),
-    MintAuthItem:       toNano('0.0032'),
-    MintAuthItemInForwardFee: toNano('0.005'),
-    DeployResult:       toNano('0.0002'),
-    //
-    Withdraw:           toNano('0.0045'),
-    _Withdraw:          toNano('0.0090'),
-    _WithdrawReply:     toNano('0.0060'),    
-    WithdrawResult:     toNano('0.0002'),
-    //
-    PutToVoteUpdateSettings:    toNano('0.0046'),
-    _PutToVoteUpdateSettings:   toNano('0.0085'),
-
-    PutToVoteMintAuthItem:      toNano('0.0048'),
-    _PutToVoteMintAuthItem:     toNano('0.0292'),
-
-    _PutToVoteReply:   toNano('0.0045'),
-    PutToVoteResult:   toNano('0.0002'),
-
-    //
-    MintPetMemoryNft:               toNano('0.0228'),
-    _MintPetMemoryNft:              toNano('0.0114'),
-    _MintPetMemoryNftInForwardFee:  toNano('0.009'),
-    DestroyPetMemoryNft:            toNano('0.009'),
-    EditPetMemoryNft:               toNano('0.010'),
-    TransferPetMemoryNft:           toNano('0.0103'),
-}
-
-
-const MinTransactionTons = {
-    get CollectionDeploy(): bigint {
-        return StorageTonsReserve.Collection +
-            StorageTonsReserve.AuthItem +
-            MaxGasConsumption.Deploy +
-            MaxGasConsumption.DeployInForwardFee +
-            MaxGasConsumption.MintAuthItem +
-            MaxTonsDifference;
-    },
-
-    get Withdraw(): bigint {
-        return MaxGasConsumption.Withdraw + 
-            MaxGasConsumption._Withdraw + 
-            MaxGasConsumption._WithdrawReply + 
-            MaxTonsDifference;
-    },
-
-
-    get _MintPetMemoryNft(): bigint {
-        return toNano("0.05") + // Storage Fee
-            MaxGasConsumption._MintPetMemoryNft +
-            MaxGasConsumption._MintPetMemoryNftInForwardFee;
-    },
-
-    get MintPetMemoryNft(): bigint {
-        return toNano("0.025") + toNano("0.05") + // ClassA + ClassB Fees
-            toNano("0.05") + // Storage Fee
-            MaxGasConsumption.MintPetMemoryNft +
-            MaxGasConsumption._MintPetMemoryNft +
-            MaxGasConsumption._MintPetMemoryNftInForwardFee +
-            MaxTonsDifference;
-    },
-
-    get EditPetMemoryNft(): bigint {
-        return MaxGasConsumption._MintPetMemoryNft +
-            MaxGasConsumption._MintPetMemoryNftInForwardFee +
-            MaxTonsDifference;
-    },
-
-    get DestroyPetMemoryNft(): bigint {
-        return MaxGasConsumption.EditPetMemoryNft + MaxTonsDifference;
-    },
-
-    get TransferPetMemoryNft(): bigint {
-        return MaxGasConsumption.TransferPetMemoryNft + MaxTonsDifference;
-    },
+    Collection:             toNano('0.05'),
+    PetMemoryNftMinting:    toNano('0.05'),
+    PetMemoryNftMin:        toNano('0.01'),
 }
 
 function dumpTransactions(txs: BlockchainTransaction[]) {
-    fs.writeFileSync('./transactions.json', transactionStringify(txs)); 
+    fs.writeFileSync('./tests/transactions.json', transactionStringify(txs)); 
 }
 
 function describe_(...args: any) {
 }
 
-const PrefixUri = "tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/";
-const PrefixUriNew = "https://raw.githubusercontent.com/xeronm/pm-assets/refs/heads/main/";
+const PrefixUriNew = "tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/images/";
+const PrefixUriDefault = "https://muratov.xyz/petsmem/images/";
+
+const nftData: NftMutableMetaData = {
+    $$type: 'NftMutableMetaData',
+    uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
+    image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
+    imageData: null,
+    description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
+                "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
+                " out of an abandoned private house, looked at people with piercing emerald eyes," +
+                " and screamed. We tried to feed him, but that day I realized that if he did not" +
+                " run out at some day, I would not be able to forgive myself. An hour later, my" +
+                " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
+                " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
+                " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
+                " but he had an iron will to live. However, on 11/15/2024, he passed away."
+}
+
+const nftImmData: PetMemoryNftImmutableData = {
+    $$type: 'PetMemoryNftImmutableData',
+    species: 2n,
+    name: 'Marcus',
+    sex: 0n,
+    speciesName: null,
+    breed: 'Nibelung',
+    lang: 0x8Dn,         // "en"
+    countryCode: 0x234n, // "ru"
+    location: 'Krasnodar 350020',
+    birthDate: 0n,
+    deathDate: 0x20241115n,
+}
 
 async function decodeNftMetadata(cell: Cell): Promise<{[key: string]: string | Buffer}> {
     const data = cell.asSlice();
@@ -184,35 +105,49 @@ async function decodeNftMetadata(cell: Cell): Promise<{[key: string]: string | B
     return attributes; 
 }
 
+
+const resultReport: {[key: string]: any} = {
+    flows: {},
+    storageAnnualFees: {},
+    details: {},
+};
+
+function dumpResultReport() {
+    fs.writeFileSync(
+        './tests/report.json', 
+        JSON.stringify(resultReport, (k, v) => (typeof v === 'bigint' ? fromNano(v) : v), 4)
+    ); 
+}
+
 describe('PetsCollection Deploy', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
     let petsCollection: SandboxContract<PetsCollection>;
-    let resultReport: any;
-
-    beforeAll(async () => {
-        resultReport = {};
-    });
+    let addrNames: {[name: string]: Address};
 
     afterAll(async () => {
-        console.log(resultReport);
+        dumpResultReport();
     });
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
-
         deployer = await blockchain.treasury('deployer');
+
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
+
+        addrNames = {
+            'Deployer': deployer.address,
+            'Collection': petsCollection.address,
+        }
     });
 
-    it('should deploy', async () => {
-        resultReport.collectionDeployTons = fromNano(MinTransactionTons.CollectionDeploy);
-
+    it('Deploy: should deploy', async () => {
+        // 1. Deploy
         const deployResult = await petsCollection.send(
             deployer.getSender(),
             {
-                value: MinTransactionTons.CollectionDeploy
+                value: MaxTransactionAmount
             },
             {
                 $$type: 'Deploy',
@@ -220,13 +155,113 @@ describe('PetsCollection Deploy', () => {
             }
         );
 
-        console.log('Deploy transaction details:');
-        printTransactionFees(deployResult.transactions);
+        resultReport.details.CollectionDeploy = transactionReport(deployResult.transactions, PetsCollection.opcodes, addrNames);
+        // console.log('Deploy transaction details:');
+        // printTransactionFees(deployResult.transactions);
+        // dumpTransactions(deployResult.transactions);
 
-        const flow = transactionAmountFlow(deployResult.transactions, deployer.address);
-        resultReport.deployPetsCollectionFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
+        const contract = await blockchain.getContract(petsCollection.address);
+        expect(contract.balance).toBe(StorageTonsReserve.Collection);
 
-        // 1. Root Transaction
+        resultReport.flows.CollectionDeploy = { 
+            ...transactionAmountFlow(deployResult.transactions),
+            collectionBalance: contract.balance
+        };
+
+        expect(deployResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address, deploy: true},
+            {from: petsCollection.address},
+        ]);
+    });
+        
+    it('Deploy: should not deploy (InsufficientFunds)', async () => {       
+        const deployResult = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: StorageTonsReserve.Collection,
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            }
+        );
+        resultReport.details.CollectionDeploy_InsufficientFunds = transactionReport(deployResult.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(deployResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            actionResultCode: ExitCodes.ErrorNotEnoughtToncoin,
+        });
+    });        
+});
+
+
+describe('PetsCollection Methods', () => {
+    let blockchain: Blockchain;
+    let deployer: SandboxContract<TreasuryContract>;
+    let petsCollection: SandboxContract<PetsCollection>;
+    let deployResult: SendMessageResult;
+    let anyUser: SandboxContract<TreasuryContract>;
+    let nftUser: SandboxContract<TreasuryContract>;
+    let addrNames: {[name: string]: Address};    
+
+
+    async function mintNft(feeClassA: bigint = 0n, feeClassB: bigint = 0n,
+        sender: SandboxContract<TreasuryContract> | null = null, value: bigint | null = null, data?: NftMutableMetaData) {
+        const mintNftResult = await petsCollection.send(
+            (sender || nftUser).getSender(),
+            {
+                value: value || MaxTransactionAmount
+            },
+            {
+                $$type: 'MintPetMemoryNft',
+                queryId: 0n,
+                feeClassA: feeClassA,
+                feeClassB: feeClassB,
+                newOwner: sender ? nftUser.address : null,
+                content: {
+                    $$type: 'PetMemoryNftContent',
+                    immData: nftImmData,
+                    data: data ?? nftData
+                }
+            }
+        );
+    
+        // 4. Minted Account
+        let nftItem: SandboxContract<PetMemoryNft> | undefined;
+        const mintedAccounts = mintNftResult.events.filter((x) => x.type == 'account_created');
+        if (mintedAccounts.length == 1) {
+            nftItem = blockchain.openContract(PetMemoryNft.fromAddress(mintedAccounts[0].account));
+        }
+    
+        return {mintNftResult, nftItem};
+    }
+
+    afterAll(async () => {
+        dumpResultReport();
+    });
+
+    beforeEach(async () => {
+        blockchain = await Blockchain.create();
+
+        deployer = await blockchain.treasury('deployer');
+
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
+
+        deployResult = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'Deploy',
+                queryId: 0n,
+            }
+        );
+
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
             to: petsCollection.address,
@@ -234,35 +269,23 @@ describe('PetsCollection Deploy', () => {
             success: true,
         });
 
-        // 2. Minted Account
-        const createdAccounts = deployResult.events.filter((x) => x.type == 'account_created');
-        expect(createdAccounts.length).toEqual(2);
-        const authItem = blockchain.openContract(AuthItem.fromAddress(createdAccounts[1].account));
+        nftUser = await blockchain.treasury('NFT User');
+        anyUser = await blockchain.treasury('Any User');
 
-        // 3. Mint NFT Transaction
-        expect(deployResult.transactions).toHaveTransaction({
-            from: petsCollection.address,
-            to: authItem.address,
-            deploy: true,
-            success: true,
-        });
+        addrNames = {
+            'Deployer': deployer.address,
+            'NftOwner': nftUser.address,
+            'AnyUser': anyUser.address,
+            'Collection': petsCollection.address,
+        }
+    });
 
-        expect(deployResult.transactions).toHaveTransactionSeq([
-            {},
-            {totalFeesUpper: MaxGasConsumption.Deploy, to: petsCollection.address},
-            {totalFeesUpper: MaxGasConsumption.MintAuthItem, valueLower: toNano("0.04"), valueUpper: toNano("0.05"), from: petsCollection.address},
-        ]);
+    it('<Get>: getInfo()', async () => {
 
-        // 4. Collection Info
+        // 2. Collection Info
         const info = await petsCollection.getInfo();
         expect(info).toEqual({
             $$type: 'Info',
-            voteAction: null,
-            voteDurationHours: 24n,
-            votesFor: 0n,
-            votesAgainst: 0n,
-            classACount: 1n,
-            classBCount: 0n,
             feeStorageTons: toNano("0.05"),
             feeClassATons: toNano("0.025"),
             feeClassBTons: toNano("0.05"),
@@ -270,125 +293,51 @@ describe('PetsCollection Deploy', () => {
             balanceClassA: toNano("0.05"),
             balanceClassB: 0n,
         });        
+    });
 
-        // 5. AuthItem Info
-        const authItemInfo = await authItem.getInfo();
-
-        resultReport.authItemBalance = fromNano(authItemInfo.balance);
-        expect(authItemInfo.collectionAddress).toEqualAddress(petsCollection.address);
-        expect(authItemInfo.ownerAddress).toEqualAddress(deployer.address);
-        expect(authItemInfo.balance).toBeGreaterThanOrEqual(toNano("0.04"));
-        expect(authItemInfo.balance).toBeLessThanOrEqual(StorageTonsReserve.AuthItem + MaxTonsDifference);
-        expect(authItemInfo).toEqual({
-            $$type: 'AuthItemInfo',
-            collectionAddress: authItemInfo.collectionAddress,
-            ownerAddress: authItemInfo.ownerAddress,
-            index: 1n,
-            isClassB: false,
-            voteStateId: null,
-            balanceWithdrawn: 0n,
-            balance: authItemInfo.balance
-        });
-
-        // 6. get_collection_data()
+    it('<Get>: get_collection_data()', async () => {
+        // 3. get_collection_data()
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/collection.png'
-        });
-
-        // 7. AuthItem get_nft_data()
-        const nftData = await authItem.getGetNftData();
-        expect(nftData.isInitialized).toBe(true);
-
-        // 8. AuthItem get_nft_content()
-        const nftContent =  await petsCollection.getGetNftContent(nftData.index, nftData.individualContent);
-        const attributes2 = await decodeNftMetadata(nftContent);
-        expect(attributes2).toStrictEqual({
-            name: 'Test Collection - Class A',
-            description: 'Class A Token',
-            image: 'tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/classA.png',
+            image: 'https://muratov.xyz/petsmem/images/collection.png'
         });
     });
-        
-    it('should not deploy (InsufficientFunds)', async () => {       
-        const deployResult = await petsCollection.send(
-            deployer.getSender(),
+
+    it('<Storage>: verify storage fees for 1 Year', async () => {
+        const deposit1 = await petsCollection.send(
+            anyUser.getSender(),
             {
-                value: StorageTonsReserve.Collection + StorageTonsReserve.AuthItem,
+                value: MinTransactionAmount,                
             },
+            null,            
+        )
+
+        resultReport.details.CollectionDeposit = transactionReport(deposit1.transactions, PetsCollection.opcodes, addrNames);
+        resultReport.flows.CollectionDeposit = transactionAmountFlow(deposit1.transactions);
+
+        const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
+        const time2 = time1 + 365 * 24 * 60 * 60;                                  // offset for a year        
+        blockchain.now = time2;                                                    // set current time
+
+        const res2 = await petsCollection.send(
+            anyUser.getSender(),
             {
-                $$type: 'Deploy',
-                queryId: 0n,
-            }
-        );
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorInsufficientFunds,
-        });
-    });        
-});
-
-
-describe('PetsCollection AuthItem (Single)', () => {
-    let blockchain: Blockchain;
-    let deployer: SandboxContract<TreasuryContract>;
-    let petsCollection: SandboxContract<PetsCollection>;
-    let authItem: SandboxContract<AuthItem>;
-    let deployResult: SendMessageResult;
-    let resultReport: any;
-
-    beforeAll(async () => {
-        resultReport = {};
-    });
-
-    afterAll(async () => {
-        console.log(resultReport);
-    });
-
-    beforeEach(async () => {
-        blockchain = await Blockchain.create();
-
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
-
-        deployer = await blockchain.treasury('deployer');
-
-        deployResult = await petsCollection.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionTons.CollectionDeploy,
+                value: MinTransactionAmount,
             },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            }
-        );
+            null
+        )
+        const report2 = transactionReport(res2.transactions, PetsCollection.opcodes, addrNames);
+        resultReport.storageAnnualFees.Collection = report2[1].storageFees ?? 0n;
+    })
 
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: petsCollection.address,
-            deploy: true,
-            success: true,
-        });
-
-        // 2. Minted Account
-        const createdAccounts = deployResult.events.filter((x) => x.type == 'account_created');
-        expect(createdAccounts.length).toEqual(2);
-        authItem = blockchain.openContract(AuthItem.fromAddress(createdAccounts[1].account));        
-    });
-
-
-    it('should not deploy (Second Deploy)', async () => {       
+    it('Deploy: should not deploy (Second Deploy)', async () => {       
         const deployResult2 = await petsCollection.send(
             deployer.getSender(),
             {
-                value: MinTransactionTons.CollectionDeploy,
+                value: MaxTransactionAmount,
             },
             {
                 $$type: 'Deploy',
@@ -405,897 +354,571 @@ describe('PetsCollection AuthItem (Single)', () => {
         });
     });  
 
-    it('verify available withdraw balance', async () => {
-        // 1. Initial balance = 0.05 TON
-        const availableForWithdraw1 = await petsCollection.getAvailableForWithdraw(false, 0n);
-        resultReport.availableForWithdraw1 = fromNano(availableForWithdraw1);
-        expect(availableForWithdraw1).toBe(0n);
-
-        // 2. Deposit 0.02 TON, less than feeClassATons
-        const deposit1 = await petsCollection.send(
+    it('UpdateSettings: should update settings', async () => {
+        const updateSettings = await petsCollection.send(
             deployer.getSender(),
             {
-                value: toNano("0.02") + MaxGasConsumption.Deposit,
-            },
-            null
-        )
-        const availableForWithdraw2 = await petsCollection.getAvailableForWithdraw(false, 0n);        
-        resultReport.availableForWithdraw2 = fromNano(availableForWithdraw2);
-        expect(availableForWithdraw2).toBe(0n);
-
-        // 3. Deposit 0.02 TON, less than feeClassATons
-        const deposit2 = await petsCollection.send(
-            deployer.getSender(),
-            {
-                value: toNano("0.02") + MaxGasConsumption.Deposit,
-            },
-            null
-        )
-        expect(deposit1.transactions[1].totalFees.coins).toBeLessThanOrEqual(MaxGasConsumption.Deposit);
-
-        const availableForWithdraw3 = await petsCollection.getAvailableForWithdraw(false, 0n);
-        resultReport.availableForWithdraw3 = fromNano(availableForWithdraw3);
-        expect(availableForWithdraw3).toBeGreaterThan(toNano("0.04"));
-
-        const availableForWithdraw4 = await petsCollection.getAvailableForWithdraw(false, toNano("0.01"));
-        resultReport.availableForWithdraw4 = fromNano(availableForWithdraw4);
-        expect(availableForWithdraw4).toBeGreaterThan(toNano("0.04") - toNano("0.01"));
-
-        const availableForWithdraw5 = await petsCollection.getAvailableForWithdraw(false, toNano("0.02"));
-        resultReport.availableForWithdraw5 = fromNano(availableForWithdraw5);
-        expect(availableForWithdraw5).toBe(0n);
-    });
-
-    it('verify storage fees for 1 Year', async () => {
-        const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
-        const time2 = time1 + 365 * 24 * 60 * 60;                                  // offset for a year
-
-        const user = await blockchain.treasury('user');
-        
-        blockchain.now = time2;                                                    // set current time
-        const res1 = await petsCollection.send(
-            user.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            null
-        )
-        const flow1 = transactionAmountFlow(res1.transactions, user.address);
-        resultReport.storagePetsCollection = fromNano(flow1.storageFees);
-        expect(flow1.storageFees).toBeLessThanOrEqual(MaxFeeStoragePerYear.PetsCollection);
-
-        const res2 = await authItem.send(
-            user.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            null
-        )
-        const flow2 = transactionAmountFlow(res2.transactions, user.address);
-        resultReport.storageAuthItem = fromNano(flow2.storageFees);
-        expect(flow2.storageFees).toBeLessThanOrEqual(MaxFeeStoragePerYear.AuthItem);
-    });
-
-    it('Unathorized PuToVote (direct API call)', async () => {
-        const msg = beginCell();
-        storeUpdateSettings({
-            $$type: 'UpdateSettings',
-            feeStorage: 0x3An,
-            feeClassA: 0n,
-            feeClassB: 0n,
-            voteDurationHours: 24n,
-            prefixUri: null,
-        })(msg);
-        msg.endCell();
-
-        const putToVoteResult = await petsCollection.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionAmount,
+                value: MaxTransactionAmount,
             },
             {
-                $$type: 'PutToVote',
+                $$type: 'UpdateSettings',
                 queryId: 0n,
-                index: 0n,
-                isClassB: false,
-                message: msg.asCell(),
+                feeStorage: 0x3An,
+                feeClassA: 0x30n,
+                feeClassB: 0n,
+                prefixUri: PrefixUriNew,
             }
         )
 
-        expect(putToVoteResult.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorNotAuthorized,
-        });    
-    });
+        resultReport.details.CollectionUpdateSettings = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
 
-    it('AuthItem: should not withdraw (Unathorized)', async () => {
-        const user = await blockchain.treasury('unauthorized user');
-
-        const withdrawResult = await authItem.send(
-            user.getSender(),
-            {
-                value: MinTransactionTons.Withdraw,
-            },
-            {
-                $$type: 'AuthItemWithdraw',
-                'queryId': 0n,
-            }            
-        );
-        
-        expect(withdrawResult.transactions).toHaveTransaction({
-            from: user.address,
-            to: authItem.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorNotAuthorized,
-        });        
-    });
-
-    it('AuthItem: should not withdraw (not enought gas)', async () => {
-        const availableForWithdraw1 = await petsCollection.getAvailableForWithdraw(false, 0n);
-        expect(availableForWithdraw1).toBe(0n);
-   
-        const balance1 = await deployer.getBalance();
-        const info1 = await petsCollection.getInfo();
-
-        // 1. Failing 1-st message in chain
-        const withdrawResult1 = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MaxGasConsumption.Withdraw - MaxTonsDifference,
-            },
-            {
-                $$type: 'AuthItemWithdraw',
-                'queryId': 0n,
-            }
-        );
-        expect(withdrawResult1.transactions.length).toBe(2);
-        expect(withdrawResult1.transactions).toHaveTransactionSeq([
-            {totalFeesUpper: MaxGasConsumption.ExtMessage},
-            {totalFeesUpper: MaxGasConsumption.Withdraw, to: authItem.address, success: false},
-        ]);        
-
-        const info2 = await petsCollection.getInfo();
-        expect(info2).toEqual(info1);
-
-        // 2. Failing 2-nd message in chain
-        const withdrawResult2 = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MaxGasConsumption.Withdraw + MaxGasConsumption._Withdraw 
-                    - MaxTonsDifference,
-            },
-            {
-                $$type: 'AuthItemWithdraw',
-                'queryId': 0n,
-            }
-        );
-        expect(withdrawResult2.transactions.length).toBe(3);
-        expect(withdrawResult2.transactions).toHaveTransactionSeq([
-            {totalFeesUpper: MaxGasConsumption.ExtMessage},
-            {totalFeesUpper: MaxGasConsumption.Withdraw, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption._Withdraw, to: petsCollection.address, success: false},
-        ]);        
-       
-
-        const info3 = await petsCollection.getInfo();
-        expect(info3).toEqual(info1);
-
-        // 3. Failing 3-rd message in chain
-        const withdrawResult3 = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MaxGasConsumption.Withdraw + MaxGasConsumption._Withdraw + 
-                    MaxGasConsumption._WithdrawReply - MaxTonsDifference,
-            },
-            {
-                $$type: 'AuthItemWithdraw',
-                'queryId': 0n,
-            }
-        );
-        expect(withdrawResult3.transactions.length).toBe(4);
-        expect(withdrawResult3.transactions).toHaveTransactionSeq([
-            {totalFeesUpper: MaxGasConsumption.ExtMessage},
-            {totalFeesUpper: MaxGasConsumption.Withdraw, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption._Withdraw, to: petsCollection.address},
-            {totalFeesUpper: MaxGasConsumption._WithdrawReply, from: petsCollection.address, success: false},
-        ]);   
-
-        const info4 = await petsCollection.getInfo();
-        expect(info4).toStrictEqual(info1);
-    });
-
-    it('AuthItem: should withdraw (gas enought for 2-nd message, get rest from withdrawal amount)', async () => {
-        const availableForWithdraw1 = await petsCollection.getAvailableForWithdraw(false, 0n);
-        expect(availableForWithdraw1).toBe(0n);
-   
-        const balance1 = await deployer.getBalance();
-        const info1 = await petsCollection.getInfo();
-
-        // 1. Deposit some TONs and try to withdraw with enought gas for 2-nd message processing
-        //    as a result 3-rd and 4-th message would be process for withdrawn non-zero value
-        const user = await blockchain.treasury('user');
-        const deposit = await petsCollection.send(
-            user.getSender(),
-            {
-                value: toNano("0.1"),
-            },
-            null
-        );        
-
-        // 2. Gas enought for 3-rd message in chain
-        const withdrawResult = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MaxGasConsumption.Withdraw + MaxGasConsumption._Withdraw + 
-                    MaxGasConsumption._WithdrawReply,
-            },
-            {
-                $$type: 'AuthItemWithdraw',
-                'queryId': 0n,
-            }
-        );
-        expect(withdrawResult.transactions.length).toBe(5);
-
-        let result1: any = {value: null};
-        if ('body' in withdrawResult.events[3]) {
-            result1 = loadAuthItemWithdrawResult(withdrawResult.events[3].body.asSlice());
-        }
-        expect(result1.value).toBeGreaterThanOrEqual(toNano("0.1") - MaxGasConsumption.Deposit);        
-
-        const info2 = await petsCollection.getInfo();
-        expect(info2).toEqual({...info1, balanceClassA: info1.balanceClassA + result1.value});
-    });
-
-    it('AuthItem: should withdraw (itemCount=1)', async () => {
-        const availableForWithdraw1 = await petsCollection.getAvailableForWithdraw(false, 0n);
-        expect(availableForWithdraw1).toBe(0n);
-
-        const balance1 = await deployer.getBalance();
-
-        resultReport.withdrawAuthItemTons =  fromNano(MinTransactionTons.Withdraw);
-        const withdrawResult1 = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionTons.Withdraw,
-            },
-            {
-                $$type: 'AuthItemWithdraw',
-                'queryId': 0n,
-            }
-        );
-        console.log('Withdraw Transaction details:');
-        printTransactionFees(withdrawResult1.transactions);
-        expect(withdrawResult1.transactions).toHaveTransactionSeq([
-            {totalFeesUpper: MaxGasConsumption.ExtMessage},
-            {totalFeesUpper: MaxGasConsumption.Withdraw, from: deployer.address, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption._Withdraw, to: petsCollection.address},
-            {totalFeesUpper: MaxGasConsumption._WithdrawReply, from: petsCollection.address, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption.WithdrawResult, from: authItem.address, to: deployer.address},
-        ]);  
-
-        const flow1 = transactionAmountFlow(withdrawResult1.transactions, deployer.address);
-        resultReport.withdrawAuthItemFlow = { amount: fromNano(flow1.outAmount - flow1.inAmount), totalFees: fromNano(flow1.totalFees)};
-    
-        const balance2 = await deployer.getBalance();
-        expect(balance2).toBeGreaterThanOrEqual(balance1 - (
-            MaxGasConsumption.ExtMessage + 
-            MaxGasConsumption.ExtInForwardFee +
-            MinTransactionTons.Withdraw +
-            MaxGasConsumption.WithdrawResult) 
-        );
-
-        let result1: any = {value: null};
-        if ('body' in withdrawResult1.events[3]) {
-            result1 = loadAuthItemWithdrawResult(withdrawResult1.events[3].body.asSlice());
-        }
-        expect(result1.value).toBe(0n);
-
-        // 2. After deposit some TONs
-        const user = await blockchain.treasury('user');
-
-        const deposit1 = await petsCollection.send(
-            user.getSender(),
-            {
-                value: toNano("0.1"),
-            },
-            null
-        );
-        expect(deposit1.transactions).toHaveTransaction({
-            from: user.address,
-            to: petsCollection.address,
-            success: true,
-        });        
-
-        const balance3 = await deployer.getBalance();
-
-        const withdrawResult2 = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemWithdraw',
-                'queryId': 0n,
-            }
-        );        
-        expect(withdrawResult2.transactions).toHaveTransaction({
-            from: authItem.address,
-            to: deployer.address,
-            success: true,
-        });
-        const balance4 = await deployer.getBalance();
-
-        let result2: any = {value: null};
-        if ('body' in withdrawResult2.events[3]) {
-            result2 = loadAuthItemWithdrawResult(withdrawResult2.events[3].body.asSlice());
-        }
-        expect(result2.value).toBeGreaterThanOrEqual(toNano("0.1") - MaxGasConsumption.Deposit);
-
-        // console.log(balance3, balance4, result2);
-    });
-
-    it('AuthItem: PutToVote->UpdateSettings', async () => {
-        const msg = beginCell();
-        storeUpdateSettings({
-            $$type: 'UpdateSettings',
-            feeStorage: 0x3An,
-            feeClassA: 0n,
-            feeClassB: 0n,
-            voteDurationHours: 24n,
-            prefixUri: PrefixUriNew,
-        })(msg);
-        msg.endCell();
-
-        const updateSettings = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemPutToVote',
-                queryId: 0n,
-                message: msg.asCell()
-            }
-        )
-
-        console.log('PutToVote(UpdateSettings) Transdaction details:');
-        printTransactionFees(updateSettings.transactions);
         expect(updateSettings.transactions).toHaveTransactionSeq([
-            {totalFeesUpper: MaxGasConsumption.ExtMessage},
-            {totalFeesUpper: MaxGasConsumption.PutToVoteUpdateSettings, from: deployer.address, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption._PutToVoteUpdateSettings, to: petsCollection.address},
-            {totalFeesUpper: MaxGasConsumption._PutToVoteReply, from: petsCollection.address, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption.PutToVoteResult, from: authItem.address, to: deployer.address},
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: deployer.address},
         ]);
 
-        const flow = transactionAmountFlow(updateSettings.transactions, deployer.address);
-        resultReport.updateSettingPetsCollectionFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
-
+        resultReport.flows.CollectionUpdateSettings = transactionAmountFlow(updateSettings.transactions);
 
         const info = await petsCollection.getInfo();
-        expect(info.voteAction).toBeNull();
-        // if (info.voteAction?.message) {
-        //     const msgUpdateSettings = loadUpdateSettings(info.voteAction.message.asSlice());
-        //     expect(msgUpdateSettings).toStrictEqual({
-        //         $$type: 'UpdateSettings',
-        //         queryId: 0n,
-        //         feeStorage: 0x3An,
-        //         feeClassA: 0n,
-        //         feeClassB: 0n
-        //     });
-        // }
 
         expect(info).toStrictEqual({
             $$type: 'Info',
-            voteAction: null,
-            voteDurationHours: 24n,
-            votesFor: 0n,
-            votesAgainst: 0n,
-            classACount: 1n,
-            classBCount: 0n,
             feeStorageTons: toNano("0.025"),
-            feeClassATons: toNano("0"),
+            feeClassATons: toNano("0.001"),
             feeClassBTons: toNano("0"),
             balance: StorageTonsReserve.Collection,
             balanceClassA: toNano("0.05"),
             balanceClassB: 0n,
         });
 
-        const authItemInfo = await authItem.getInfo();
-        expect(authItemInfo.collectionAddress).toEqualAddress(petsCollection.address);
-        expect(authItemInfo.ownerAddress).toEqualAddress(deployer.address);
-        expect(authItemInfo.balance).toBeGreaterThanOrEqual(toNano("0.04"));
-        expect(authItemInfo.balance).toBeLessThanOrEqual(StorageTonsReserve.AuthItem + MaxTonsDifference); 
-        expect(authItemInfo.voteStateId).not.toBeNull();
+        const data =  await petsCollection.getGetCollectionData();
+        const attributes = await decodeNftMetadata(data.collectionContent);
+        expect(attributes).toStrictEqual({
+            name: 'Test Collection',
+            description: 'Test Collection Description',
+            image: 'tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/images/collection.png'
+        });        
     });    
 
-    it('AuthItem: PutToVote->MintAuthItem', async () => {
-        const userA = await blockchain.treasury('user class A');
-        const userB = await blockchain.treasury('user class B');
-        const items = <Dictionary<number, MintAuthItemItem>>Dictionary.empty();
-        items.set(0, {
-            $$type: 'MintAuthItemItem',
-            owner: userA.address,
-            isClassB: false,
-        });
-        items.set(1, 
-        {
-            $$type: 'MintAuthItemItem',
-            owner: userB.address,
-            isClassB: true,
-        });        
-
-        const msg = beginCell();
-        storeMintAuthItems({
-            $$type: 'MintAuthItems',
-            items: items,
-        })(msg);
-        msg.endCell();
-
-        const mintAuthItems = await authItem.send(
-            deployer.getSender(),
+    it('UpdateSettings: should not update settings (Unathorized)', async () => {
+        const updateSettings = await petsCollection.send(
+            anyUser.getSender(),
             {
-                value: StorageTonsReserve.AuthItem * 2n + MinTransactionAmount,
+                value: MinTransactionAmount,
             },
             {
-                $$type: 'AuthItemPutToVote',
+                $$type: 'UpdateSettings',
                 queryId: 0n,
-                message: msg.asCell()
+                feeStorage: 0x3An,
+                feeClassA: 0n,
+                feeClassB: 0n,
+                prefixUri: null,
+            }
+        )
+        resultReport.details.CollectionUpdateSettings_Unauthorized = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(updateSettings.transactions).toHaveTransaction({
+            from: anyUser.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            exitCode: ExitCodes.ErrorNotAuthorized,
+        });    
+    });
+
+    it('Withdraw: should withdraw (classA)', async () => {
+        // 1. Deposit some TONs
+        const deposit1 = await petsCollection.send(
+            anyUser.getSender(),
+            {
+                value: toNano("0.1"),
+            },
+            null
+        );
+
+        expect(deposit1.transactions).toHaveTransaction({
+            from: anyUser.address,
+            to: petsCollection.address,
+            success: true,
+        });
+
+        const info = await petsCollection.getInfo();
+        expect(info.balanceClassA).toBeLessThan(StorageTonsReserve.Collection + toNano('0.1'));
+        expect(info.balanceClassA).toBeGreaterThan(StorageTonsReserve.Collection + toNano('0.1') - MinTransactionAmount);
+        expect(info.balanceClassB).toBe(0n);
+
+        const balance1 = await deployer.getBalance();
+
+        const withdrawAmount = info.balanceClassA - StorageTonsReserve.Collection;
+        const withdrawResult1 = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'Withdraw',
+                queryId: 0n,
+                isClassB: false,
+                amount: withdrawAmount,
+                customPayload: null,
+                forwardDestination: null,
+                forwardPayload: new Cell().asSlice(),
+            }
+        );
+
+        resultReport.details.CollectionWithdraw = transactionReport(withdrawResult1.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(withdrawResult1.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: deployer.address},
+        ]);  
+
+        resultReport.flows.CollectionWithdraw = transactionAmountFlow(withdrawResult1.transactions);    
+        resultReport.flows.CollectionWithdraw.withdrawnAmount = withdrawAmount;
+
+        const info2 = await petsCollection.getInfo();
+        expect(info2.balanceClassA).toBe(toNano('0.05')); // storageReserve
+        expect(info2.balance).toBe(toNano('0.05'));
+
+        const balance2 = await deployer.getBalance();
+        expect(balance2).toBeGreaterThanOrEqual(balance1 + withdrawAmount - MaxBalanceDifference);
+    });
+
+    it('Withdraw: should withdraw with forwarding (classA)', async () => {
+        // 1. Deposit some TONs
+        const deposit1 = await petsCollection.send(
+            anyUser.getSender(),
+            {
+                value: toNano("0.1"),
+            },
+            null
+        );
+
+        expect(deposit1.transactions).toHaveTransaction({
+            from: anyUser.address,
+            to: petsCollection.address,
+            success: true,
+        });
+
+        const info = await petsCollection.getInfo();
+        expect(info.balanceClassA).toBeLessThan(StorageTonsReserve.Collection + toNano('0.1'));
+        expect(info.balanceClassA).toBeGreaterThan(StorageTonsReserve.Collection + toNano('0.1') - MinTransactionAmount);
+        expect(info.balanceClassB).toBe(0n);
+
+        const balance1 = await deployer.getBalance();
+        const withdrawAmount = info.balanceClassA - StorageTonsReserve.Collection;
+
+        const userBalance1 = await anyUser.getBalance();
+        const withdrawResult1 = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'Withdraw',
+                queryId: 0n,
+                isClassB: false,
+                amount: withdrawAmount,
+                customPayload: null,
+                forwardDestination: anyUser.address,
+                forwardPayload: new Cell().asSlice(),
+            }
+        );
+
+        resultReport.details.CollectionWithdrawAndForward = transactionReport(withdrawResult1.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(withdrawResult1.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: anyUser.address, 
+                valueLower: withdrawAmount - MinTransactionAmount,  valueUpper: withdrawAmount},
+            {from: petsCollection.address, to: deployer.address},
+        ]);  
+
+        resultReport.flows.CollectionWithdrawAndForward = transactionAmountFlow(withdrawResult1.transactions);
+    
+        const info2 = await petsCollection.getInfo();
+        expect(info2.balanceClassA).toBe(toNano('0.05')); // storageReserve
+        expect(info2.balance).toBe(toNano('0.05'));
+
+        const balance2 = await deployer.getBalance();
+        expect(balance2).toBeGreaterThanOrEqual(balance1 - MaxBalanceDifference);
+
+        const userBalance2 = await anyUser.getBalance();
+        expect(userBalance2).toBeGreaterThanOrEqual(userBalance1 + withdrawAmount - MaxBalanceDifference);
+    });    
+
+
+    it('Withdraw: should withdraw (classB)', async () => {        
+        // Deposit fee for minting on Class B balance 
+        const { mintNftResult, nftItem } = await mintNft();
+
+        const info = await petsCollection.getInfo();
+        expect(info.balanceClassA).toBeGreaterThan(toNano('0.074'));
+        expect(info.balanceClassA).toBeLessThan(toNano('0.075'));
+        expect(info.balanceClassB).toBe(toNano('0.05'));
+
+        const balance1 = await deployer.getBalance();
+        const withdrawAmount = toNano('0.025');
+        const withdrawResult1 = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'Withdraw',
+                queryId: 0n,
+                isClassB: true,
+                amount: withdrawAmount,
+                customPayload: null,
+                forwardDestination: null,
+                forwardPayload: new Cell().asSlice(),
+            }
+        );
+
+        resultReport.details.CollectionWithdrawClassB = transactionReport(withdrawResult1.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(withdrawResult1.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: deployer.address},
+        ]);  
+
+        resultReport.flows.CollectionWithdrawClassB = transactionAmountFlow(withdrawResult1.transactions);
+        resultReport.flows.CollectionWithdrawClassB.withdrawnAmount = withdrawAmount;
+
+        const info2 = await petsCollection.getInfo();
+        expect(info2.balanceClassA).toBe(info.balanceClassA);
+        expect(info2.balance).toBe(info2.balanceClassA + info2.balanceClassB);
+
+        const balance2 = await deployer.getBalance();
+        expect(balance2).toBeGreaterThanOrEqual(balance1 + withdrawAmount - MaxBalanceDifference);
+    });
+
+    it('Withdraw: should not withdraw (Unathorized)', async () => {
+        const info1 = await petsCollection.getInfo();
+        const withdrawResult = await petsCollection.send(
+            anyUser.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'Withdraw',
+                queryId: 0n,
+                isClassB: false,
+                amount: toNano('0.01'),
+                customPayload: null, 
+                forwardDestination: null,
+                forwardPayload: new Cell().asSlice(),
+            }            
+        );
+        resultReport.details.CollectionWithdraw_Unathorized = transactionReport(withdrawResult.transactions, PetsCollection.opcodes, addrNames);
+
+        const info2 = await petsCollection.getInfo();
+        expect(info2.balanceClassA).toBe(info1.balanceClassA);
+        expect(info2.balance).toBe(info1.balance);
+
+        expect(withdrawResult.transactions).toHaveTransaction({
+            from: anyUser.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            exitCode: ExitCodes.ErrorNotAuthorized,
+        });        
+    });
+
+    it('Withdraw: should not withdraw (InsufficientFunds)', async () => {
+        const info1 = await petsCollection.getInfo();        
+        const withdrawResult = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'Withdraw',
+                queryId: 0n,
+                isClassB: false,
+                amount: toNano('0.01'),
+                customPayload: null, 
+                forwardDestination: null,
+                forwardPayload: new Cell().asSlice(),
+            }                        
+        );
+
+        resultReport.details.CollectionWithdraw_InsufficientFunds = transactionReport(withdrawResult.transactions, PetsCollection.opcodes, addrNames);
+
+        const info2 = await petsCollection.getInfo();
+        expect(info2.balanceClassA).toBe(info1.balanceClassA);
+        expect(info2.balance).toBe(info1.balance);
+
+        expect(withdrawResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            exitCode: ExitCodes.ErrorInsufficientFunds,
+        });             
+    });
+
+    it('ChageOwner: should change owner', async () => {
+        const changeOwner = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'ChangeOwner',
+                queryId: 0n,
+                newOwner: anyUser.address
             }
         )
 
-        expect(mintAuthItems.transactions).toHaveTransaction({
-            from: authItem.address,
+        resultReport.details.CollectionChangeOwner = transactionReport(changeOwner.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(changeOwner.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: deployer.address},
+        ]);
+
+        resultReport.flows.CollectionChangeOwner = transactionAmountFlow(changeOwner.transactions);
+
+        const info = await petsCollection.getInfo();
+
+        const data =  await petsCollection.getGetCollectionData();
+        expect(data.ownerAddress).toEqualAddress(anyUser.address);
+    });    
+
+    it('ChageOwner: should not withdraw (Unathorized)', async () => {
+        const changeOwner = await petsCollection.send(
+            anyUser.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'ChangeOwner',
+                queryId: 0n,
+                newOwner: anyUser.address
+            }
+        )
+
+        resultReport.details.CollectionChangeOwner_Unathorized = transactionReport(changeOwner.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(changeOwner.transactions).toHaveTransaction({
+            from: anyUser.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            exitCode: ExitCodes.ErrorNotAuthorized,
+        });        
+    });
+
+
+    it('MintPetMemoryNft: shloud mint NFT for sender', async () => {
+        const { mintNftResult, nftItem } = await mintNft();
+
+        resultReport.details.MintPetMemoryNft = transactionReport(mintNftResult.transactions, PetsCollection.opcodes, 
+            {...addrNames, NftItem: nftItem?.address});
+
+        resultReport.flows.MintPetMemoryNft = transactionAmountFlow(mintNftResult.transactions);
+
+        expect(mintNftResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address},
+            {from: petsCollection.address, deploy: true},
+        ]);
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const contract = await blockchain.getContract(nftItem.address);
+            resultReport.flows.MintPetMemoryNft.nftBalance = contract.balance;
+            expect(contract.balance).toBe(toNano("0.05"));
+    
+            const nftData2 = await nftItem.getGetNftData();
+            expect(nftData2.isInitialized).toBe(true);
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);    
+        }
+    });
+
+    it('MintPetMemoryNft: shloud mint NFT for 3rd party user', async () => {
+        const { mintNftResult, nftItem } = await mintNft(0n, 0n, anyUser);
+
+        resultReport.details.MintPetMemoryNft3rdParty = transactionReport(mintNftResult.transactions, PetsCollection.opcodes,
+            {...addrNames, NftItem: nftItem?.address});
+
+        resultReport.flows.MintPetMemoryNft3rdParty = transactionAmountFlow(mintNftResult.transactions);
+
+        expect(mintNftResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address},
+            {from: petsCollection.address, deploy: true},
+        ]);        
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const contract = await blockchain.getContract(nftItem.address);
+            resultReport.flows.MintPetMemoryNft3rdParty.nftBalance = contract.balance;
+            expect(contract.balance).toBe(toNano("0.05"));
+
+            const nftData2 = await nftItem.getGetNftData();
+            expect(nftData2.isInitialized).toBe(true);
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
+        }
+    });
+
+    it('MintPetMemoryNft: shloud not mint NFT (InsufficientFunds)', async () => {
+        const { mintNftResult, nftItem } = await mintNft(0x40n, 0x40n);
+
+        resultReport.details.MintPetMemoryNft_InsufficientFunds = transactionReport(mintNftResult.transactions, PetsCollection.opcodes,
+            {...addrNames, NftItem: nftItem?.address});
+
+        expect(mintNftResult.transactions).toHaveTransaction({
+            from: nftUser.address,
             to: petsCollection.address,
             success: false,
             aborted: true,
             exitCode: ExitCodes.ErrorInsufficientFunds,
         });
+        
+        const { mintNftResult: mintNftResult2 } = await mintNft(0n, 0n, null, toNano("0.025"));
 
-        const deposit = await petsCollection.send(
-            deployer.getSender(),
+        resultReport.details.MintPetMemoryNft_InsufficientFunds2 = transactionReport(mintNftResult2.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(mintNftResult2.transactions).toHaveTransaction({
+            from: nftUser.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            exitCode: ExitCodes.ErrorInsufficientFunds,
+        });          
+    });
+
+    it('Withdraw: should withdraw (classA, in 1 year)', async () => {
+        // 1. Deposit some TONs
+        const deposit1 = await petsCollection.send(
+            anyUser.getSender(),
             {
-                value: StorageTonsReserve.AuthItem * 2n + MinTransactionAmount,
+                value: toNano("0.1"),
             },
             null
-        );         
+        );
 
-        const info = await petsCollection.getInfo();        
-
-        const mintAuthItems2 = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemPutToVote',
-                queryId: 0n,
-                message: msg.asCell()
-            }
-        )
-
-        console.log('PutToVote(MintAuthItem) Transdaction details:');
-        printTransactionFees(mintAuthItems2.transactions);
-
-        const createdAccounts = mintAuthItems2.events.filter((x) => x.type == 'account_created');
-        expect(createdAccounts.length).toEqual(2);
-        const createdContracts = createdAccounts.map(x => blockchain.openContract(AuthItem.fromAddress(x.account)));
-
-        expect(mintAuthItems2.transactions).toHaveTransactionSeq([
-            {totalFeesUpper: MaxGasConsumption.ExtMessage},
-            {totalFeesUpper: MaxGasConsumption.PutToVoteMintAuthItem, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption._PutToVoteMintAuthItem, to: petsCollection.address},
-            {totalFeesUpper: MaxGasConsumption.MintAuthItem, valueLower: toNano("0.04"), valueUpper: toNano("0.05"), 
-                from: petsCollection.address, to: createdContracts[0].address},
-            {totalFeesUpper: MaxGasConsumption.MintAuthItem, valueLower: toNano("0.04"), valueUpper: toNano("0.05"), 
-                from: petsCollection.address, to: createdContracts[1].address},
-            {totalFeesUpper: MaxGasConsumption._PutToVoteReply, from: petsCollection.address, to: authItem.address},
-            {totalFeesUpper: MaxGasConsumption.PutToVoteResult, from: authItem.address, to: deployer.address},
-        ]);           
-
-        const flow = transactionAmountFlow(mintAuthItems2.transactions, deployer.address);
-        resultReport.mintAuthItemPetsCollectionFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
-
-        const authItem1Info = await createdContracts[0].getInfo();
-        expect(authItem1Info.collectionAddress).toEqualAddress(petsCollection.address);
-        expect(authItem1Info.ownerAddress).toEqualAddress(userA.address);
-        expect(authItem1Info).toEqual({
-            $$type: 'AuthItemInfo',
-            collectionAddress: authItem1Info.collectionAddress,
-            ownerAddress: authItem1Info.ownerAddress,
-            index: 2n,
-            isClassB: false,
-            voteStateId: null,
-            balanceWithdrawn: 0n,
-            balance: authItem1Info.balance
-        });
-
-        const authItem2Info = await createdContracts[1].getInfo();
-        expect(authItem2Info.collectionAddress).toEqualAddress(petsCollection.address);
-        expect(authItem2Info.ownerAddress).toEqualAddress(userB.address);
-        expect(authItem2Info).toEqual({
-            $$type: 'AuthItemInfo',
-            collectionAddress: authItem2Info.collectionAddress,
-            ownerAddress: authItem2Info.ownerAddress,
-            index: 3n,
-            isClassB: true,
-            voteStateId: null,
-            balanceWithdrawn: 0n,
-            balance: authItem2Info.balance
-        });
-
-        const info2 = await petsCollection.getInfo();
-        expect(info2.voteAction).toBeNull();
-        expect(info2).toStrictEqual({
-            $$type: 'Info',
-            voteAction: null,
-            voteDurationHours: 24n,
-            votesFor: 0n,
-            votesAgainst: 0n,
-            classACount: 2n,
-            classBCount: 1n,
-            feeStorageTons: toNano("0.05"),
-            feeClassATons: toNano("0.025"),
-            feeClassBTons: toNano("0.05"),
-            balance: info2.balance,
-            balanceClassA: info2.balance,
-            balanceClassB: 0n,
-        });
-               
-    });
-
-});
-
-
-describe('PetsCollection AuthItem (Multiple: PutToVote->TransferAuthItem)', () => {
-    let blockchain: Blockchain;
-    let deployer: SandboxContract<TreasuryContract>;
-    let user1: SandboxContract<TreasuryContract>;
-    let user2: SandboxContract<TreasuryContract>;
-    let user3: SandboxContract<TreasuryContract>;
-    let user4: SandboxContract<TreasuryContract>;
-    let petsCollection: SandboxContract<PetsCollection>;
-    let authItem: SandboxContract<AuthItem>;
-    let deployResult: SendMessageResult;
-    let resultReport: any;
-    let authItem1: SandboxContract<AuthItem>;
-    let authItem2: SandboxContract<AuthItem>;
-    let authItem3: SandboxContract<AuthItem>;
-    let authItem4: SandboxContract<AuthItem>;
-
-    beforeAll(async () => {
-        resultReport = {};
-    });
-
-    afterAll(async () => {
-        console.log(resultReport);
-    });
-
-    beforeEach(async () => {
-        blockchain = await Blockchain.create();
-
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
-
-        deployer = await blockchain.treasury('deployer');
-
-        deployResult = await petsCollection.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionTons.CollectionDeploy,
-            },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            }
-        );        
-
-        expect(deployResult.transactions).toHaveTransaction({
-            from: deployer.address,
+        expect(deposit1.transactions).toHaveTransaction({
+            from: anyUser.address,
             to: petsCollection.address,
-            deploy: true,
             success: true,
-        });    
-
-        // 2. Minted Account
-        const createdAccounts = deployResult.events.filter((x) => x.type == 'account_created');
-        expect(createdAccounts.length).toEqual(2);
-        authItem = blockchain.openContract(AuthItem.fromAddress(createdAccounts[1].account));
-        
-
-        const deposit = await petsCollection.send(
-            deployer.getSender(),
-            {
-                value: toNano("1"),
-            },
-            null
-        );     
-
-        user1 = await blockchain.treasury('user 1 class A');
-        user2 = await blockchain.treasury('user 2 class A');
-        user3 = await blockchain.treasury('user 3 class A');
-        user4 = await blockchain.treasury('user 4 class B');
-        const items = <Dictionary<number, MintAuthItemItem>>Dictionary.empty();
-        items.set(0, {
-            $$type: 'MintAuthItemItem',
-            owner: user1.address,
-            isClassB: false,
-        });
-        items.set(1, {
-            $$type: 'MintAuthItemItem',
-            owner: user2.address,
-            isClassB: false,
-        });        
-        items.set(2, {
-            $$type: 'MintAuthItemItem',
-            owner: user3.address,
-            isClassB: false,
-        }); 
-        items.set(3, {
-            $$type: 'MintAuthItemItem',
-            owner: user4.address,
-            isClassB: true,
-        }); 
-
-        const msg = beginCell();
-        storeMintAuthItems({
-            $$type: 'MintAuthItems',
-            items: items,
-        })(msg);
-        msg.endCell();
-
-        const mintAuthItems = await authItem.send(
-            deployer.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemPutToVote',
-                queryId: 0n,
-                message: msg.asCell()
-            }
-        )
-
-        const createdAccounts2 = mintAuthItems.events.filter((x) => x.type == 'account_created');
-        expect(createdAccounts2.length).toEqual(4);
-        authItem1 = blockchain.openContract(AuthItem.fromAddress(createdAccounts2[0].account));
-        authItem2 = blockchain.openContract(AuthItem.fromAddress(createdAccounts2[1].account));
-        authItem3 = blockchain.openContract(AuthItem.fromAddress(createdAccounts2[2].account));
-        authItem4 = blockchain.openContract(AuthItem.fromAddress(createdAccounts2[3].account));
-        
-        const user5 = await blockchain.treasury('user 5');
-        const transfetItems = <Dictionary<number, TransferAuthItemItem>>Dictionary.empty();
-        transfetItems.set(0, {
-            $$type: 'TransferAuthItemItem',
-            address: authItem1.address,
-            newOwner: user5.address,
-        });
-        transfetItems.set(1, {
-            $$type: 'TransferAuthItemItem',
-            address: authItem2.address,
-            newOwner: petsCollection.address,
         });
 
-        const msg2 = beginCell();
-        storeTransferAuthItems({
-            $$type: 'TransferAuthItems',
-            items: transfetItems,
-        })(msg2);
-        msg2.endCell();
+        const info = await petsCollection.getInfo();
+        expect(info.balanceClassA).toBeLessThan(StorageTonsReserve.Collection + toNano('0.1'));
+        expect(info.balanceClassA).toBeGreaterThan(StorageTonsReserve.Collection + toNano('0.1') - MinTransactionAmount);
+        expect(info.balanceClassB).toBe(0n);
 
-        const transferAuthItems = await authItem.send(
+        const balance1 = await deployer.getBalance();
+
+        const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
+        const time2 = time1 + 365 * 24 * 60 * 60;                                  // offset for a year        
+        blockchain.now = time2;                                                    // set current time
+
+        const withdrawAmount = info.balanceClassA - StorageTonsReserve.Collection - resultReport.storageAnnualFees.Collection;
+        const withdrawResult1 = await petsCollection.send(
             deployer.getSender(),
             {
-                value: StorageTonsReserve.AuthItem * 2n + MinTransactionAmount,
+                value: MaxTransactionAmount,
             },
             {
-                $$type: 'AuthItemPutToVote',
+                $$type: 'Withdraw',
                 queryId: 0n,
-                message: msg2.asCell()
+                isClassB: false,
+                amount: withdrawAmount,
+                customPayload: null,
+                forwardDestination: null,
+                forwardPayload: new Cell().asSlice(),
             }
-        )
+        );
 
-        const flow = transactionAmountFlow(transferAuthItems.transactions, deployer.address);
-        resultReport.transferAuthItemsPetsCollectionFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
+        resultReport.details.CollectionWithdraw_1year = transactionReport(withdrawResult1.transactions, PetsCollection.opcodes, addrNames);
 
-             
-        const info1 = await petsCollection.getInfo();
-        expect(info1.voteAction).not.toBeNull();
-        expect(info1.votesFor).toBe(1n);
-        expect(info1.votesAgainst).toBe(0n);
-        expect(info1.classACount).toBe(4n);
-    });
+        expect(withdrawResult1.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: deployer.address},
+        ]);  
 
-    it('AuthItem: AuthItemVote should declined due to VoteInvalidState', async () => {
-        const info1 = await petsCollection.getInfo();
+        resultReport.flows.CollectionWithdraw_1year = transactionAmountFlow(withdrawResult1.transactions);    
+        resultReport.flows.CollectionWithdraw_1year.withdrawnAmount = withdrawAmount;
 
-        const user1Vote = await authItem1.send(
-            user1.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemVote',
-                queryId: 0n,
-                stateId: (info1.voteAction?.stateId ?? 0n) + 1n,
-                vote: true,
-            }
-        )
-        
-        expect(user1Vote.transactions).toHaveTransaction({
-            from: authItem1.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorVoteInvalidState,
-        });         
-    });
-
-    it('AuthItem: AuthItemVote should declined due to VoteExpired', async () => {
-        const info1 = await petsCollection.getInfo();
-
-        const time1 = Math.floor(Date.now() / 1000);                         // current local unix time
-        const time2 = time1 + 24 * 60 * 60;                                  // offset for 24 hours
-
-        blockchain.now = time2;  
-
-        const user1Vote = await authItem1.send(
-            user1.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemVote',
-                queryId: 0n,
-                stateId: info1.voteAction?.stateId ?? 0n,
-                vote: true,
-            }
-        )
-        
-        expect(user1Vote.transactions).toHaveTransaction({
-            from: authItem1.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorVoteExpired,
-        });         
-    });
-
-
-    it('AuthItem: AuthItemVote should accept 2 votes & execute', async () => {
-        const info1 = await petsCollection.getInfo();
-
-        const user1Vote = await authItem1.send(
-            user1.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemVote',
-                queryId: 0n,
-                stateId: info1.voteAction?.stateId ?? 0n,
-                vote: true,
-            }
-        )      
-        const flow1 = transactionAmountFlow(user1Vote.transactions, user1.address);
-        resultReport.votePetsCollectionFlow = { amount: fromNano(flow1.outAmount - flow1.inAmount), totalFees: fromNano(flow1.totalFees)};
-
-        
         const info2 = await petsCollection.getInfo();
-        expect(info2.voteAction).not.toBeNull();
-        expect(info2.votesFor).toBe(2n);
+        expect(info2.balanceClassA).toBe(toNano('0.05')); // storageReserve
+        expect(info2.balance).toBe(toNano('0.05'));
 
-        const item1Info = await authItem1.getInfo();
-        expect(item1Info.voteStateId).toBe(info1.voteAction?.stateId ?? 0n);
+        const balance2 = await deployer.getBalance();
+        expect(balance2).toBeGreaterThanOrEqual(balance1 + withdrawAmount - MaxBalanceDifference);
+    });
 
-        //
-        const user1VoteDup = await authItem1.send(
-            user1.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemVote',
-                queryId: 0n,
-                stateId: info1.voteAction?.stateId ?? 0n,
-                vote: true,
-            }
-        )
-        expect(user1VoteDup.transactions).toHaveTransaction({
-            to: authItem1.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorVoteDuplicated,
-        });        
+    it('MintPetMemoryNft: shloud mint NFT for sender (in 1 year)', async () => {
+        const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
+        const time2 = time1 + 365 * 24 * 60 * 60;                                  // offset for a year        
+        blockchain.now = time2;                                                    // set current time
 
-        const user2Vote = await authItem2.send(
-            user2.getSender(),
-            {
-                value: MinTransactionAmount,
-            },
-            {
-                $$type: 'AuthItemVote',
-                queryId: 0n,
-                stateId: info1.voteAction?.stateId ?? 0n,
-                vote: true,
-            }
-        )
-        const flow2 = transactionAmountFlow(user2Vote.transactions, user2.address);
-        resultReport.voteAndExecutePetsCollectionFlow = { amount: fromNano(flow2.outAmount - flow2.inAmount), totalFees: fromNano(flow2.totalFees)};
+        const { mintNftResult, nftItem } = await mintNft();
 
-        printTransactionFees(user2Vote.transactions);
+        resultReport.details.MintPetMemoryNft_1year = transactionReport(mintNftResult.transactions, PetsCollection.opcodes, 
+            {...addrNames, NftItem: nftItem?.address});
 
-        const info3 = await petsCollection.getInfo();
-        expect(info3.voteAction).toBeNull();
-        expect(info3.votesFor).toBe(0n);
-    }); 
+        resultReport.flows.MintPetMemoryNft_1year = transactionAmountFlow(mintNftResult.transactions);
+
+        expect(mintNftResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address},
+            {from: petsCollection.address, deploy: true},
+        ]);
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const contract = await blockchain.getContract(nftItem.address);
+            resultReport.flows.MintPetMemoryNft_1year.nftBalance = contract.balance;
+            expect(contract.balance).toBe(toNano("0.05"));
+    
+            const nftData2 = await nftItem.getGetNftData();
+            expect(nftData2.isInitialized).toBe(true);
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);    
+        }
+    });
 
 });
 
 
-describe('PetsCollection PetMemoryNft', () => {
+describe('PetMemoryNft Methods', () => {
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
-    let user1: SandboxContract<TreasuryContract>;
     let petsCollection: SandboxContract<PetsCollection>;
-    let authItem: SandboxContract<AuthItem>;
     let deployResult: SendMessageResult;
-    let resultReport: any;
-
-    const nftData: NftMutableMetaData = {
-        $$type: 'NftMutableMetaData',
-        uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
-        image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
-        imageData: null,
-        description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
-                    "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
-                    " out of an abandoned private house, looked at people with piercing emerald eyes," +
-                    " and screamed. We tried to feed him, but that day I realized that if he did not" +
-                    " run out at some day, I would not be able to forgive myself. An hour later, my" +
-                    " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
-                    " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
-                    " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
-                    " but he had an iron will to live. However, on 11/15/2024, he passed away."
-    }
-
-    const nftImmData: PetMemoryNftImmutableData = {
-        $$type: 'PetMemoryNftImmutableData',
-        species: 2n,
-        name: 'Marcus',
-        sex: 0n,
-        speciesName: null,
-        breed: 'Nibelung',
-        lang: 0x8Dn,         // "en"
-        countryCode: 0x234n, // "ru"
-        location: 'Krasnodar 350020',
-        birthDate: 0n,
-        deathDate: 0x20241115n,
-    }
+    let anyUser: SandboxContract<TreasuryContract>;
+    let nftUser: SandboxContract<TreasuryContract>;
+    let addrNames: {[name: string]: Address};        
 
     beforeAll(async () => {
-        resultReport = {};
     });
 
     afterAll(async () => {
-        console.log(resultReport);
+        dumpResultReport();
     });
 
-    async function mintNft(feeClassA: bigint = 0n, feeClassB: bigint = 0n, 
-        newOwner: Address | null = null, data?: NftMutableMetaData) {
+    async function mintNft(data?: NftMutableMetaData) {
         const mintNftResult = await petsCollection.send(
-            user1.getSender(),
+            nftUser.getSender(),
             {
-                value: MinTransactionTons.MintPetMemoryNft + (data ? toNano('0.1') : 0n)
+                value: MaxTransactionAmount
             },
             {
                 $$type: 'MintPetMemoryNft',
                 queryId: 0n,
-                feeClassA: feeClassA,
-                feeClassB: feeClassB,
-                newOwner: newOwner,
+                feeClassA: 0n,
+                feeClassB: 0n,
+                newOwner: null,
                 content: {
                     $$type: 'PetMemoryNftContent',
                     immData: nftImmData,
@@ -1316,15 +939,14 @@ describe('PetsCollection PetMemoryNft', () => {
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
-
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(PrefixUri));
-
         deployer = await blockchain.treasury('deployer');
+
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
 
         deployResult = await petsCollection.send(
             deployer.getSender(),
             {
-                value: MinTransactionTons.CollectionDeploy,
+                value: MaxTransactionAmount,
             },
             {
                 $$type: 'Deploy',
@@ -1338,67 +960,21 @@ describe('PetsCollection PetMemoryNft', () => {
             deploy: true,
             success: true,
         });
-
-        // 2. Minted Account
-        const createdAccounts = deployResult.events.filter((x) => x.type == 'account_created');
-        expect(createdAccounts.length).toEqual(2);
-        authItem = blockchain.openContract(AuthItem.fromAddress(createdAccounts[1].account));  
         
-        user1 = await blockchain.treasury('some user 1');
+        nftUser = await blockchain.treasury('some NFT user 1');
+        anyUser = await blockchain.treasury('Any User');
+
+        addrNames = {
+            'Deployer': deployer.address,
+            'NftOwner': nftUser.address,
+            'AnyUser': anyUser.address,
+            'Collection': petsCollection.address,
+        }        
     });
+        
 
-    it('shloud mint NFT for sender', async () => {
-        resultReport.mintPetMemoryNftTons = fromNano(MinTransactionTons.MintPetMemoryNft);
-        const { mintNftResult, nftItem } = await mintNft();
-
-        const flow = transactionAmountFlow(mintNftResult.transactions, user1.address);
-        resultReport.mintPetMemoryNftFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
-
-        console.log('Mint NFT transaction details:');
-        printTransactionFees(mintNftResult.transactions);
-
-        expect(mintNftResult.transactions).toHaveTransactionSeq([
-            {},
-            {totalFeesUpper: MaxGasConsumption.MintPetMemoryNft, to: petsCollection.address},
-            {totalFeesUpper: MaxGasConsumption._MintPetMemoryNft, from: petsCollection.address, 
-                valueLower: MinTransactionTons._MintPetMemoryNft, deploy: true},
-        ]);
-
-        expect(nftItem).not.toBeUndefined();
-        if (nftItem) {
-            const contract = await blockchain.getContract(nftItem.address);
-            expect(contract.balance).toBe(toNano("0.05"));
-            resultReport.mintPetMemoryNftBalance = fromNano(contract.balance);
-    
-            const nftData2 = await nftItem.getGetNftData();
-            expect(nftData2.isInitialized).toBe(true);
-            expect(nftData2.ownerAddress).toEqualAddress(user1.address);    
-        }
-    });
-
-
-    it('shloud mint NFT for 3rd party user', async () => {
-        const user2 = await blockchain.treasury('some user 2');
-
-        const { mintNftResult, nftItem } = await mintNft(0n, 0n, user2.address);
-        expect(mintNftResult.transactions).toHaveTransactionSeq([
-            {},
-            {totalFeesUpper: MaxGasConsumption.MintPetMemoryNft, to: petsCollection.address},
-            {totalFeesUpper: MaxGasConsumption._MintPetMemoryNft, from: petsCollection.address, 
-                valueLower: MinTransactionTons._MintPetMemoryNft, deploy: true},
-        ]);        
-
-        expect(nftItem).not.toBeUndefined();
-        if (nftItem) {
-            const nftData = await nftItem.getGetNftData();
-            expect(nftData.isInitialized).toBe(true);
-            expect(nftData.ownerAddress).toEqualAddress(user2.address);
-        }
-    });
-
-
-    it('verify storage fees for 1 Year', async () => {
-        const { nftItem: nftItem1 } = await mintNft(0n, 0n, null, {
+    it('<Storage>: verify storage fees for 1 Year', async () => {
+        const { nftItem: nftItem1 } = await mintNft({
                 $$type: 'NftMutableMetaData',
                 description: null,
                 image: null,
@@ -1408,22 +984,26 @@ describe('PetsCollection PetMemoryNft', () => {
         const { nftItem: nftItem2 } = await mintNft();
 
 
-        const { mintNftResult: mintNftResult128, nftItem: nftItem3 } = await mintNft(0n, 0n, null, {
+        const { mintNftResult: mintNftResult128, nftItem: nftItem3 } = await mintNft({
                 ...nftData, 
                 imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-128x128.jpg'))
             });
 
-        const flow128 = transactionAmountFlow(mintNftResult128.transactions, user1.address);
-        resultReport.mintBig128PetMemoryNftFlow = { amount: fromNano(flow128.outAmount - flow128.inAmount), totalFees: fromNano(flow128.totalFees)};
+        resultReport.details.MintPetMemoryNft_Big128 = transactionReport(mintNftResult128.transactions, PetsCollection.opcodes, 
+            {...addrNames, NftItem: nftItem1?.address});
 
-        const { mintNftResult: mintNftResult256, nftItem: nftItem4 } = await mintNft(0n, 0n, null, {
+
+        resultReport.flows.MintPetMemoryNft_Big128 = transactionAmountFlow(mintNftResult128.transactions);
+
+        const { mintNftResult: mintNftResult256, nftItem: nftItem4 } = await mintNft({
             ...nftData, 
             imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-256x256.jpg'))
         });
 
-        const flow256 = transactionAmountFlow(mintNftResult256.transactions, user1.address);
-        resultReport.mintBig256PetMemoryNftFlow = { amount: fromNano(flow256.outAmount - flow256.inAmount), totalFees: fromNano(flow256.totalFees)};
+        resultReport.details.MintPetMemoryNft_Big256 = transactionReport(mintNftResult256.transactions, PetsCollection.opcodes,
+            {...addrNames, NftItem: nftItem4?.address});            
 
+        resultReport.flows.MintPetMemoryNft_Big256 = transactionAmountFlow(mintNftResult256.transactions);
     
         const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
         const time2 = time1 + 365 * 24 * 60 * 60;                                  // offset for a year
@@ -1432,41 +1012,28 @@ describe('PetsCollection PetMemoryNft', () => {
 
 
         for (const x of [
-            { item: nftItem1, attr: 'storageSmallPetMemoryNft', maxFee: MaxFeeStoragePerYear.MemoryNftSmall},
-            { item: nftItem2, attr: 'storageMediumPetMemoryNft', maxFee: MaxFeeStoragePerYear.MemoryNftMedium},
-            { item: nftItem3, attr: 'storageBig128PetMemoryNft', maxFee: MaxFeeStoragePerYear.MemoryNftBig128},
-            { item: nftItem4, attr: 'storageBig256PetMemoryNft', maxFee: MaxFeeStoragePerYear.MemoryNftBig256},
+            { item: nftItem1, attr: 'MintPetMemoryNft_small'},
+            { item: nftItem2, attr: 'MintPetMemoryNft_medium'},
+            { item: nftItem3, attr: 'MintPetMemoryNft_big128'},
+            { item: nftItem4, attr: 'MintPetMemoryNft_big256'},
         ]) {
             expect(x.item).toBeDefined();
             if (x.item) {
                 const res = await x.item.send(
-                    user1.getSender(),
+                    nftUser.getSender(),
                     {
                         value: MinTransactionAmount,
                     },
                     null
                 )
-                const flow = transactionAmountFlow(res.transactions, user1.address);
-                resultReport[x.attr] = fromNano(flow.storageFees);
-                expect(flow.storageFees).toBeLessThanOrEqual(x.maxFee);
+                const report = transactionReport(res.transactions, PetsCollection.opcodes, addrNames);
+                resultReport.storageAnnualFees[x.attr] = report[1].storageFees ?? 0n;
             }    
         }
 
-    });    
-        
-    it('shloud not mint NFT (InsufficientFunds)', async () => {
-        const { mintNftResult } = await mintNft(0x40n, 0x40n);
-        expect(mintNftResult.transactions).toHaveTransaction({
-            from: user1.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorInsufficientFunds,
-        });        
     });
-
-    it('shloud destroy', async () => {
-        resultReport.destroyPetMemoryNftTons = fromNano(MinTransactionTons.DestroyPetMemoryNft);
+    
+    it('Destroy: shloud destroy', async () => {
         const { nftItem } = await mintNft();
         expect(nftItem).not.toBeUndefined();
         if (nftItem) {
@@ -1476,24 +1043,23 @@ describe('PetsCollection PetMemoryNft', () => {
             const balaneBefore = contract.balance;
 
             const destroyResult = await nftItem.send(
-                user1.getSender(),
+                nftUser.getSender(),
                 {
-                    value: MinTransactionTons.DestroyPetMemoryNft,
+                    value: MaxTransactionAmount,
                 },
                 'Destroy'
             );
             
-            const flow = transactionAmountFlow(destroyResult.transactions, user1.address);
-            resultReport.destroyPetMemoryNftFlow = { amount: fromNano(balaneBefore + flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};            
+            resultReport.details.PetMemoryNftDestroy = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});
 
-            console.log('Destroy NFT transaction details:');
-            printTransactionFees(destroyResult.transactions);
-
+            resultReport.flows.PetMemoryNftDestroy = transactionAmountFlow(destroyResult.transactions);
+            resultReport.flows.PetMemoryNftDestroy.nftBalance = balaneBefore;
+            
             expect(destroyResult.transactions).toHaveTransactionSeq([
                 {},
-                {totalFeesUpper: MaxGasConsumption.DestroyPetMemoryNft, from: user1.address, to: nftItem.address},
-                {totalFeesUpper: MaxGasConsumption._MintPetMemoryNft, from: nftItem.address, to: user1.address,
-                    valueLower: balaneBefore},
+                {from: nftUser.address, to: nftItem.address},
+                {from: nftItem.address, to: nftUser.address, valueLower: balaneBefore},
             ]);   
 
             expect(contract.balance).toBe(0n);
@@ -1501,18 +1067,21 @@ describe('PetsCollection PetMemoryNft', () => {
         }
     });     
 
-    it('shloud not Destroy (NotAuthorized)', async () => {
+    it('Destroy: shloud not Destroy (Unauthorized)', async () => {
         const { nftItem } = await mintNft();
         expect(nftItem).toBeDefined();
         if (nftItem) {
             const destroyResult = await nftItem.send(
                 deployer.getSender(),
                 {
-                    value: MinTransactionTons.DestroyPetMemoryNft,
+                    value: MaxTransactionAmount
                 },
                 'Destroy'
             );
-    
+
+            resultReport.details.PetMemoryNftDestroy_Unauthorized = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
+            
             expect(destroyResult.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: nftItem.address,
@@ -1524,22 +1093,22 @@ describe('PetsCollection PetMemoryNft', () => {
     });
 
 
-    it('get_nft_address_by_index()', async () => {
+    it('<Get>: get_nft_address_by_index()', async () => {
         const { nftItem } = await mintNft();
 
         expect(nftItem).not.toBeUndefined();
         if (nftItem) {
-            const nftData = await nftItem.getGetNftData();
+            const nftData2 = await nftItem.getGetNftData();
 
-            const nftAddress = await petsCollection.getGetNftAddressByIndex(nftData.index);
+            const nftAddress = await petsCollection.getGetNftAddressByIndex(nftData2.index);
             expect(nftAddress).toEqualAddress(nftItem.address);
         }
     });    
 
 
-    it('get_nft_content()', async () => {
+    it('<Get>: get_nft_content()', async () => {
         const imageData = fs.readFileSync('./assets/images/marcus-1-onchain-128x128.jpg');
-        const { nftItem } = await mintNft(0n, 0n, null, {
+        const { nftItem } = await mintNft({
             ...nftData, 
             imageData: toTextCellSnake(imageData),
         });
@@ -1560,15 +1129,14 @@ describe('PetsCollection PetMemoryNft', () => {
         }
     });  
     
-    it('shloud EditContent', async () => {
-        resultReport.editPetMemoryNftTons = fromNano(MinTransactionTons.EditPetMemoryNft);
+    it('EditContent: shloud edit content', async () => {
         const { nftItem } = await mintNft();
         expect(nftItem).toBeDefined();
         if (nftItem) {
             const editResult = await nftItem.send(
-                user1.getSender(),
+                nftUser.getSender(),
                 {
-                    value: MinTransactionTons.EditPetMemoryNft,
+                    value: MaxTransactionAmount
                 },
                 {
                     $$type: 'EditContent',
@@ -1583,32 +1151,66 @@ describe('PetsCollection PetMemoryNft', () => {
                 }
             );
 
-            const flow = transactionAmountFlow(editResult.transactions, user1.address);
-            resultReport.editPetMemoryNftFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
+            resultReport.details.PetMemoryNftEditContent = transactionReport(editResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
+            
+            resultReport.flows.PetMemoryNftEditContent = transactionAmountFlow(editResult.transactions);
 
             expect(editResult.transactions).toHaveTransactionSeq([
                 {},
-                {totalFeesUpper: MaxGasConsumption.EditPetMemoryNft, from: user1.address, to: nftItem.address},
+                {from: nftUser.address, to: nftItem.address},
             ]);
 
-            const nftData = await nftItem.getGetNftData();
-            const nftContent =  await petsCollection.getGetNftContent(nftData.index, nftData.individualContent);
-            const attributes = await decodeNftMetadata(nftContent);
-            expect(attributes.description).toBe('Overriden Description');
-            expect(attributes.image).toBe('tonstorage://E24049996AE60A0AC2255452B24716C6266D42B5BFA0323E1D75FB12A017B11A/cat.png');
-            expect(attributes.uri).toBeUndefined();
+            const nftData1 = await nftItem.getGetNftData();
+            const nftContent1 =  await petsCollection.getGetNftContent(nftData1.index, nftData1.individualContent);
+            const attributes1 = await decodeNftMetadata(nftContent1);
+            expect(attributes1.description).toBe('Overriden Description');
+            expect(attributes1.image).toBe('https://muratov.xyz/petsmem/images/cat.png');
+            expect(attributes1.uri).toBeUndefined();
+
+
+            const editResult2 = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: MaxTransactionAmount
+                },
+                {
+                    $$type: 'EditContent',
+                    queryId: 0n,
+                    data: {
+                        $$type: 'NftMutableMetaData',
+                        description: nftData.description,
+                        image: null,
+                        imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-256x256.jpg')),
+                        uri: nftData.uri
+                    }
+                }
+            );
+
+            resultReport.details.PetMemoryNftEditContent_big256 = transactionReport(editResult2.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
+
+            resultReport.flows.PetMemoryNftEditContent_big256 = transactionAmountFlow(editResult.transactions);
+
+            const nftData2 = await nftItem.getGetNftData();
+            const nftContent2 =  await petsCollection.getGetNftContent(nftData2.index, nftData2.individualContent);
+            const attributes2 = await decodeNftMetadata(nftContent2);
+            expect(attributes2.image).toBeUndefined();
+            expect(attributes2.description).toBe(nftData.description);            
+            expect(attributes2.uri).toBe(nftData.uri);
+            expect(attributes2.image_data.length).toBeGreaterThan(3000);      
         }
     });    
 
 
-    it('shloud not EditContent (NotAuthorized)', async () => {
+    it('EditContent: shloud not edit content (Unauthorized)', async () => {
         const { nftItem } = await mintNft();
         expect(nftItem).toBeDefined();
         if (nftItem) {
             const editResult = await nftItem.send(
                 deployer.getSender(),
                 {
-                    value: MinTransactionTons.EditPetMemoryNft,
+                    value: MaxTransactionAmount
                 },
                 {
                     $$type: 'EditContent',
@@ -1623,6 +1225,9 @@ describe('PetsCollection PetMemoryNft', () => {
                 }
             );
     
+            resultReport.details.PetMemoryNftEditContent_Unauthorized = transactionReport(editResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
+
             expect(editResult.transactions).toHaveTransaction({
                 from: deployer.address,
                 to: nftItem.address,
@@ -1634,22 +1239,18 @@ describe('PetsCollection PetMemoryNft', () => {
     });
 
     
-    it('shloud Transfer', async () => {
-        resultReport.transferPetMemoryNftTons = fromNano(MinTransactionTons.TransferPetMemoryNft);
-
-        const user2 = await blockchain.treasury('some user 2');
-
+    it('Transfer: shloud transfer', async () => {
         const { nftItem } = await mintNft();
 
         expect(nftItem).toBeDefined();
         if (nftItem) {
             const contractBefore = await blockchain.getContract(nftItem.address);
-            expect(contractBefore.balance).toBe(toNano("0.05"));
+            expect(contractBefore.balance).toBe(StorageTonsReserve.PetMemoryNftMinting);
 
             const transferResult = await nftItem.send(
-                user1.getSender(),
+                nftUser.getSender(),
                 {
-                    value: MinTransactionTons.TransferPetMemoryNft,
+                    value: MaxTransactionAmount
                 },
                 {
                     $$type: 'Transfer',
@@ -1657,41 +1258,40 @@ describe('PetsCollection PetMemoryNft', () => {
                     customPayload: null,
                     forwardAmount: 0n,
                     forwardPayload: new Cell().asSlice(),
-                    responseDestination: user1.address,
-                    newOwner: user2.address,
+                    responseDestination: nftUser.address,
+                    newOwner: anyUser.address,
                 }
             );
 
-            console.log('Transfer NFT transaction details:');
-            printTransactionFees(transferResult.transactions);            
+            resultReport.details.PetMemoryNftTransfer = transactionReport(transferResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
 
-            const flow = transactionAmountFlow(transferResult.transactions, user1.address);
-            resultReport.transferPetMemoryNftFlow = { amount: fromNano(flow.outAmount - flow.inAmount), totalFees: fromNano(flow.totalFees)};
+            resultReport.flows.PetMemoryNftTransfer = transactionAmountFlow(transferResult.transactions);
+            resultReport.flows.PetMemoryNftTransfer.excessBalance = StorageTonsReserve.PetMemoryNftMinting - StorageTonsReserve.PetMemoryNftMin;
 
             expect(transferResult.transactions).toHaveTransactionSeq([
                 {},
-                {totalFeesUpper: MaxGasConsumption.TransferPetMemoryNft, from: user1.address, to: nftItem.address},
-                {from: nftItem.address, to: user1.address, valueLower: toNano("0.04")},
+                {from: nftUser.address, to: nftItem.address},
+                {from: nftItem.address, to: nftUser.address, valueLower: StorageTonsReserve.PetMemoryNftMinting - StorageTonsReserve.PetMemoryNftMin},
             ]);
 
             const nftData = await nftItem.getGetNftData();
-            expect(nftData.ownerAddress).toEqualAddress(user2.address);
+            expect(nftData.ownerAddress).toEqualAddress(anyUser.address);
 
             const contractAfter = await blockchain.getContract(nftItem.address);
-            expect(contractAfter.balance).toBe(toNano("0.01"));
+            expect(contractAfter.balance).toBe(StorageTonsReserve.PetMemoryNftMin);
         }
     });  
 
 
-    it('shloud not Transfer (NotAuthorized)', async () => {
-        const user2 = await blockchain.treasury('some user 2');        
+    it('Transfer: hloud not transfer (Unauthorized)', async () => {
         const { nftItem } = await mintNft();
         expect(nftItem).toBeDefined();
         if (nftItem) {
             const transferResult = await nftItem.send(
-                user2.getSender(),
+                anyUser.getSender(),
                 {
-                    value: MinTransactionTons.TransferPetMemoryNft,
+                    value: MaxTransactionAmount
                 },
                 {
                     $$type: 'Transfer',
@@ -1699,13 +1299,16 @@ describe('PetsCollection PetMemoryNft', () => {
                     customPayload: null,
                     forwardAmount: 0n,
                     forwardPayload: new Cell().asSlice(),
-                    responseDestination: user1.address,
-                    newOwner: user2.address,
+                    responseDestination: nftUser.address,
+                    newOwner: anyUser.address,
                 }
             );
-    
+
+            resultReport.details.PetMemoryNftTransfer_Unauthorized = transactionReport(transferResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});
+            
             expect(transferResult.transactions).toHaveTransaction({
-                from: user2.address,
+                from: anyUser.address,
                 to: nftItem.address,
                 success: false,
                 aborted: true,
@@ -1713,5 +1316,53 @@ describe('PetsCollection PetMemoryNft', () => {
             });    
         }
     });
+
+    it('Transfer: shloud transfer (in 1 year)', async () => {
+        const { nftItem } = await mintNft();
+
+        expect(nftItem).toBeDefined();
+        if (nftItem) {
+            const contractBefore = await blockchain.getContract(nftItem.address);
+            expect(contractBefore.balance).toBe(StorageTonsReserve.PetMemoryNftMinting);
+
+            const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
+            const time2 = time1 + 365 * 24 * 60 * 60;                                  // offset for a year        
+            blockchain.now = time2;                                                    // set current time
+    
+            const transferResult = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: MaxTransactionAmount
+                },
+                {
+                    $$type: 'Transfer',
+                    queryId: 0n,
+                    customPayload: null,
+                    forwardAmount: 0n,
+                    forwardPayload: new Cell().asSlice(),
+                    responseDestination: nftUser.address,
+                    newOwner: anyUser.address,
+                }
+            );
+
+            resultReport.details.PetMemoryNftTransfer_1year = transactionReport(transferResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
+
+            resultReport.flows.PetMemoryNftTransfer_1year = transactionAmountFlow(transferResult.transactions);
+            resultReport.flows.PetMemoryNftTransfer_1year.excessBalance = StorageTonsReserve.PetMemoryNftMinting - StorageTonsReserve.PetMemoryNftMin;
+
+            expect(transferResult.transactions).toHaveTransactionSeq([
+                {},
+                {from: nftUser.address, to: nftItem.address},
+                {from: nftItem.address, to: nftUser.address, valueLower: StorageTonsReserve.PetMemoryNftMinting - StorageTonsReserve.PetMemoryNftMin},
+            ]);
+
+            const nftData = await nftItem.getGetNftData();
+            expect(nftData.ownerAddress).toEqualAddress(anyUser.address);
+
+            const contractAfter = await blockchain.getContract(nftItem.address);
+            expect(contractAfter.balance).toBe(StorageTonsReserve.PetMemoryNftMin);
+        }
+    });  
 
 });

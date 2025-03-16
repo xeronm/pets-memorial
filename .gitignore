@@ -6,6 +6,7 @@ dist
 
 # VS Code
 .vscode/*
+.env
 .history/
 *.vsix
 

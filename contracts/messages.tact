@@ -1,7 +1,8 @@
-const CollectionDeployMinTons: Int = ton("0.115");  // 2x0.05[storageReserve] + 0.015[GasFees]
-const TransferAuthItemMinTons: Int = ton("0.1");
+const MintPetMemoryNftOutFwdFeeMin: Int = ton("0.008");
+const PetMemoryNftTransferGasFee: Int = ton("0.01");
 
 const MinFeeStorage: Int = 0x38; // 0.01 TON
+const MinFeeClassA: Int = 0x30; // 0.001 TON
 
 const VoteStatusError: Int = 0;
 const VoteStatusPending: Int = 1;
@@ -13,13 +14,13 @@ const VoteOpMintAuthItem: Int = 0x3ef428b9;
 const VoteOpUpdateSettings: Int = 0x4219f222;
 const VoteOpTransferAuthItem: Int = 0x9d9f8663;
 
-fun enumToSpeciesName(species: Int): String {
+fun speciesToName(species: Int): String {
     if (species == 1) {
         return "Dog";
     }
     else if (species == 2) {
         return "Cat"
-    }
+    } 
     return "";
 }
 
@@ -38,73 +39,45 @@ struct PetMemoryNftImmutableData {
     deathDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0x00 - means unspecified or unknown
 }
 
-struct MintAuthItemItem {
-    owner: Address;
-    isClassB: Bool;    
-}
-
-struct TransferAuthItemItem {
-    address: Address;
-    newOwner: Address;
-}
-
 message Excesses {
     queryId: Int as uint64;
 }
 
-message(0x3ef428b9) MintAuthItems {
-    items: map<Int as uint4, MintAuthItemItem>;
+message ChangeOwner {
+    queryId: Int as uint64;
+    newOwner: Address;
 }
 
 message(0x4219f222) UpdateSettings {
+    queryId: Int as uint64;
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
-    voteDurationHours: Int as uint8;
     prefixUri: String?;
 }
 
-message(0x9d9f8663) TransferAuthItems {
-    items: map<Int as uint4, TransferAuthItemItem>;
-}
-
-
-// PetsCollection Interface
-message PutToVote {
+message(0xa77a7982) Withdraw {
     queryId: Int as uint64;
-    index: Int as uint4;
     isClassB: Bool;
-    message: Cell;
+    amount: Int as coins;
+    customPayload: Cell?;
+    forwardDestination: Address?;
+    forwardPayload: Slice as remaining;
 }
 
-message Vote {
+message WithdrawForward {
     queryId: Int as uint64;
-    stateId: Int as uint32;
-    index: Int as uint4;
-    isClassB: Bool;
-    vote: Bool;
-}
+    forwardPayload: Slice as remaining;
+} 
 
-message VoteReply {
+message WithdrawResult {
     queryId: Int as uint64;
-    stateId: Int as uint32;
-    status: Int as uint2;
-}
-
-message Withdraw {
-    queryId: Int as uint64;
-    index: Int as uint4;
-    isClassB: Bool;
+    isClassB: Bool;    
     balanceWithdrawn: Int as coins;
-}
+    customPayload: Cell?;
+} 
 
-message WithdrawReply {
-    queryId: Int as uint64;    
-    balanceWithdrawn: Int as coins;
-    storageReserve: Int as uint8;
-}
-
-message MintPetMemoryNft {
+message(0x399987e2) MintPetMemoryNft {
     queryId: Int as uint64;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
@@ -112,47 +85,6 @@ message MintPetMemoryNft {
     content: PetMemoryNftContent;
 }
 
-message VoteExecuteResult {
-    executor: Address;
-    voteAction: VoteAction;
-    aborted: Bool;
-}
-
-// AuthItem Interface
-struct AuthItemContent {
-    index: Int;
-    isClassB: Bool;
-}
-
-message AuthItemWithdraw {
-    queryId: Int as uint64;
-}
-
-message AuthItemWithdrawResult {
-    queryId: Int as uint64;
-    value: Int;
-}
-
-message AuthItemVote {
-    queryId: Int as uint64;
-    stateId: Int as uint32;
-    vote: Bool;    
-}
-
-message AuthItemVoteReply {
-    queryId: Int as uint64;
-    status: Int as uint2;
-}
-
-message AuthItemPutToVote {
-    queryId: Int as uint64;
-    message: Cell;
-}
-
-message AuthItemTransfer {
-    newOwner: Address;
-    balanceWithdrawn: Int as coins;
-}
 
 // PetMemoryNft Producer
 struct PetMemoryNftContent {

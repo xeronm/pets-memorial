@@ -111,7 +111,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
   }
 
   const nftAddress = await petsCollection.getGetNftAddressByIndex(collDataBefore.nextItemIndex);
-  console.log('NFT Address:', nftAddress);
+  console.log('\nNFT Address:', nftAddress);
 
   await provider.waitForDeploy(nftAddress);
   console.log('NFT deployed:', nftAddress);
