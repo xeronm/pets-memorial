@@ -1,8 +1,6 @@
-import { Address, toNano } from '@ton/core';
+import { Address } from '@ton/core';
 import { PetsCollection } from '../wrappers/PetsCollection';
-import { NetworkProvider, sleep } from '@ton/blueprint';
-const fs = require('node:fs');
-
+import { NetworkProvider } from '@ton/blueprint';
 
 
 export async function run(provider: NetworkProvider, args: string[]) {
