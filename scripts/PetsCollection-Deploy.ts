@@ -2,6 +2,8 @@ import { toNano } from '@ton/core';
 import { PetsCollection } from '../wrappers/PetsCollection';
 import { NetworkProvider } from '@ton/blueprint';
 
+console.log(process.env.WALLET_MNEMONIC);
+
 export async function run(provider: NetworkProvider) {
     const ui = provider.ui();
 
@@ -24,7 +26,6 @@ export async function run(provider: NetworkProvider) {
         },
         {
             $$type: 'Deploy',
-            queryId: 0n,
         }
     );
 

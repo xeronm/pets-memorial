@@ -25,7 +25,6 @@ export async function run(provider: NetworkProvider, args: string[]) {
     },
     {
         $$type: 'Withdraw',
-        queryId: 0n,
         amount: amount,
         isClassB: isClassB,
         customPayload: null,

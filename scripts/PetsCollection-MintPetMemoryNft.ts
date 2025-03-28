@@ -1,4 +1,4 @@
-import { Address, toNano } from '@ton/core';
+import { Address, toNano  } from '@ton/core';
 import { 
   PetsCollection, 
   NftMutableMetaData, 
@@ -15,6 +15,7 @@ const nftDataImageOnChain: NftMutableMetaData = {
   uri: null,
   image: null,
   imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-128x128.jpg')),
+  bagId: null,
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
               "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
               " out of an abandoned private house, looked at people with piercing emerald eyes," +
@@ -31,6 +32,7 @@ const nftDataImageOffChain1: NftMutableMetaData = {
   uri: null,
   image: 'https://muratov.xyz/petsmem/images/marcus-1.jpg',
   imageData: null, 
+  bagId: null,
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
               "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
               " out of an abandoned private house, looked at people with piercing emerald eyes," +
@@ -47,7 +49,8 @@ const nftDataImageOffChain2: NftMutableMetaData = {
   uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
   image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
   imageData: null,
-  description: "On-chain overriden description"
+  description: "On-chain overriden description",
+  bagId: null,
 }
 
 const nftData = nftDataImageOffChain1;
@@ -87,14 +90,14 @@ export async function run(provider: NetworkProvider, args: string[]) {
     },
     {
         $$type: 'MintPetMemoryNft',
-        queryId: 0n,
         feeClassA: 0n,
         feeClassB: 0n,
         newOwner: null,
         content: {
             $$type: 'PetMemoryNftContent',
             immData: nftImmData,
-            data: nftData
+            data: nftData,
+            feeDueTime: 0n
         }
     }
   );

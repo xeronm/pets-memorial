@@ -1,4 +1,3 @@
-import "@stdlib/deploy";
 import "./messages.tact";
 import "./exceptions.tact";
 import "./utils.tact";
@@ -11,27 +10,48 @@ contract PetMemoryNft {
     owner: Address?;
     immData: PetMemoryNftImmutableData?;
     data: NftMutableMetaData?;
+    feeDueTime: Int as uint32 = 0; // Fees for Class B target paid due time
 
     init(collectionAddress: Address, index: Int) {
-        require(sender() == collectionAddress, "ErrorNotAuthorized");
         self.collectionAddress = collectionAddress;
-        self.owner = collectionAddress;
         self.index = index;
     }
 
     receive() {
     }
 
-    receive(msg: Transfer){
+    receive(msg: DonateCollection) {
         require(sender() == self.owner!!, "ErrorNotAuthorized");
+        message(MessageParameters{
+            to: self.collectionAddress,
+            value: 0,
+            mode: SendRemainingValue,
+            bounce: true,
+            body: Donate{
+                index: self.index,
+                feeClassA: msg.feeClassA,
+                feeClassB: msg.feeClassB
+            }.toCell()
+        }); 
+    }
+
+    receive(msg: DonateReply) {
+        require(sender() == self.collectionAddress, "ErrorNotAuthorized");
+        self.feeDueTime = max(self.feeDueTime, now()) + msg.feeDueTimeAdd;
+        cashback(self.owner!!);
+    }
+
+    receive(msg: Transfer){
+        let isInitialized: Bool = self.owner != null;
+        require(sender() == (isInitialized ? self.owner!! : self.collectionAddress), "ErrorNotAuthorized");
         let storageReserve: Int = self.storageReserve;      
-        if (!self.isInitialized()) {
+        if (!isInitialized) {
             let init = PetMemoryNftInit.fromCell(msg.customPayload);
             self.immData = init.immData;
             self.data = init.data;
+            self.feeDueTime = init.feeDueTime;
             storageReserve = unpackQint(init.storageReserve);
         }
-        require(self.isInitialized(), "ErrorValidation");
 
         self.owner = msg.newOwner;        
         let needResp: Bool = msg.responseDestination != null && msg.responseDestination != newAddress(0, 0);
@@ -42,7 +62,7 @@ contract PetMemoryNft {
                     to: msg.newOwner,
                     value: msg.forwardAmount,
                     mode: SendPayGasSeparately,
-                    bounce: true,
+                    bounce: false,
                     body: OwnershipAssigned{
                         queryId: msg.queryId,
                         prevOwner: self.owner!!,
@@ -55,7 +75,7 @@ contract PetMemoryNft {
                     to: msg.responseDestination!!,
                     value: 0,
                     mode: SendPayGasSeparately + SendRemainingBalance,
-                    bounce: true,
+                    bounce: false,
                     body: Excesses{
                         queryId: msg.queryId
                     }.toCell()
@@ -85,7 +105,7 @@ contract PetMemoryNft {
         cashback(sender());
     }    
 
-    receive("Destroy") {
+    receive(msg: Destroy) {
         require(sender() == self.owner, "ErrorNotAuthorized");
         self.owner = null;
         message(MessageParameters{
@@ -93,26 +113,22 @@ contract PetMemoryNft {
             bounce: false,
             value: 0,
             mode: SendRemainingBalance + SendDestroyIfZero,
-            body: "Excess balance".asComment()
+            body: null
         });
     }    
 
     get fun get_nft_data(): GetNftData {
-        require(self.isInitialized(), "ErrorValidation");
         return GetNftData {
-            isInitialized: self.isInitialized(), 
+            isInitialized: self.owner != null, 
             index: self.index, 
             collectionAddress: self.collectionAddress, 
             ownerAddress: self.owner!!,
             individualContent: PetMemoryNftContent{
                 immData: self.immData!!,
                 data: self.data!!,
+                feeDueTime: self.feeDueTime,
             }.toCell()
         };
-    }
-
-    inline fun isInitialized(): Bool {
-        return self.data != null;
     }
 
 }
