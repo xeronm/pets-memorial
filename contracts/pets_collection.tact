@@ -265,7 +265,7 @@ contract PetsCollection {
         }
         image = content.data.image;
         imageData = content.data.imageData;
-        if ((image == null || content.data.bagId != null) && imageData == null) {
+        if ((image == null || (content.data.bagId != null && image != null && image.asSlice().loadUint(8) == 58)) && imageData == null) {
             let nftInit: StateInit = initOf PetMemoryNft(myAddress(), index);
             image = makeUri(self.prefixUri, contractAddress(nftInit).toString());
         }

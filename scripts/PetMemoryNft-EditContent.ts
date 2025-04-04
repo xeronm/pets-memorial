@@ -8,9 +8,9 @@ const fs = require('node:fs');
 const nftDataImageOffChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
-  image: 'https://upload.wikimedia.org/wikipedia/en/0/0c/Linkin_Park_Meteora_Album_Cover.jpg',
+  image: ':zl5frtaw6y3npei45avcjgpe',
   imageData: null,
-  description: "On-chain overriden description",
+  description: "Description was edited",
   bagId: BigInt('0xBA53CDEB0361AE63213FD0C3E9909EF7E8BFEAEBEBB53B90731714ABCB39FB07')
 }
 
