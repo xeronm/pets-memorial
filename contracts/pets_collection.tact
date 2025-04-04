@@ -21,39 +21,11 @@ const FieldName: Int = sha256("name");
 const FieldDescription: Int = sha256("description");
 const FieldImage: Int = sha256("image");
 const FieldImageData: Int = sha256("image_data");
-const FieldAttributes: Int = sha256("attributes");
-const FieldTraitType: Int = sha256("trait_type");
-const FieldValue: Int = sha256("value");
 
 const PetsCollectionName: String = "Test Collection";
 const PetsCollectionDescription: String = "Test Collection Description";
-const AuthClassADescription: String = "Class A Token";
-const AuthClassBDescription: String = "Class B Token";
+const DefaultPrefixUri: String = "https://muratov.xyz/nftorrent/c/";
 
-// const PetsCollectionName: String = "Pets Memorial";
-// const PetsCollectionDescription: String = "TestNet Pets Memorial";
-// const AuthClassADescription: String = "Auth Governance Token";
-// const AuthClassBDescription: String = "Auth Non-governance Token";
-
-const PetsCollectionImage: String = "collection.png";
-const AuthClassAName: String = "Class A";
-const AuthClassAImage: String = "classA.png";
-const AuthClassBName: String = "Class B";
-const AuthClassBImage: String = "classB.png";
-const ImageCat: String = "cat.png";
-const ImageDog: String = "dog.png";
-const ImageOther: String = "other.png";
-const DefaultPrefixUri: String = "https://muratov.xyz/petsmem/images/";
-
-inline fun speciesToImage(species: Int): String {
-    if (species == 1) {
-        return ImageDog;
-    }
-    else if (species == 2) {
-        return ImageCat
-    } 
-    return ImageOther;
-}
 
 fun encodeNftMetadataContent(name: String, uri: String?, description: String?, image: String?, imageData: Cell?): Cell {
     let dict: map<Int as uint256, Cell> = emptyMap();
@@ -239,7 +211,7 @@ contract PetsCollection {
             PetsCollectionName, 
             null,
             PetsCollectionDescription,
-            makeUri(self.prefixUri, PetsCollectionImage),
+            makeUri(self.prefixUri, myAddress().toString()),
             null,            
         );
 
@@ -293,8 +265,9 @@ contract PetsCollection {
         }
         image = content.data.image;
         imageData = content.data.imageData;
-        if (image == null && imageData == null) {
-            image = makeUri(self.prefixUri, speciesToImage(content.immData.species));
+        if ((image == null || content.data.bagId != null) && imageData == null) {
+            let nftInit: StateInit = initOf PetMemoryNft(myAddress(), index);
+            image = makeUri(self.prefixUri, contractAddress(nftInit).toString());
         }
     
         return encodeNftMetadataContent(
