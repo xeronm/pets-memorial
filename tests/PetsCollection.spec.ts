@@ -46,8 +46,7 @@ function dumpTransactions(txs: BlockchainTransaction[]) {
 function describe_(...args: any) {
 }
 
-const PrefixUriNew = "tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/images/";
-const PrefixUriDefault = "https://muratov.xyz/petsmem/images/";
+const PrefixUriNew = "https://muratov.xyz/petsmem/images/";
 
 const nftData: NftMutableMetaData = {
     $$type: 'NftMutableMetaData',
@@ -76,6 +75,7 @@ const nftImmData: PetMemoryNftImmutableData = {
     lang: 0x8Dn,         // "en"
     countryCode: 0x234n, // "ru"
     location: 'Krasnodar 350020',
+    geoPoint: null,
     birthDate: 0n,
     deathDate: 0x20241115n,
 }
@@ -302,7 +302,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'https://muratov.xyz/petsmem/images/collection.png'
+            image: 'https://muratov.xyz/nftorrent/c/EQBzISuKCM897sD92KU2PeuzYraCmA-k3J2PmonajqRuQ9pQ'
         });
     });
 
@@ -375,7 +375,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/images/collection.png'
+            image: 'https://muratov.xyz/petsmem/images/EQBzISuKCM897sD92KU2PeuzYraCmA-k3J2PmonajqRuQ9pQ'
         });        
     });    
 
@@ -1181,7 +1181,7 @@ describe('PetMemoryNft Methods', () => {
             const nftContent1 =  await petsCollection.getGetNftContent(nftData1.index, nftData1.individualContent);
             const attributes1 = await decodeNftMetadata(nftContent1);
             expect(attributes1.description).toBe('Overriden Description');
-            expect(attributes1.image).toBe('https://muratov.xyz/petsmem/images/cat.png');
+            expect(attributes1.image).toBe('https://muratov.xyz/nftorrent/c/EQDs20APIYzlEyCogFQRtBOX9tilxYBx3G50SDkHIlvr-Nuw');
             expect(attributes1.uri).toBeUndefined();
 
 
@@ -1214,7 +1214,30 @@ describe('PetMemoryNft Methods', () => {
             expect(attributes2.image).toBeUndefined();
             expect(attributes2.description).toBe(nftData.description);            
             expect(attributes2.uri).toBe(nftData.uri);
-            expect(attributes2.image_data.length).toBeGreaterThan(3000);      
+            expect(attributes2.image_data.length).toBeGreaterThan(3000);
+            
+            
+            const editResult3 = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: MaxTransactionAmount
+                },
+                {
+                    $$type: 'EditContent',
+                    data: {
+                        $$type: 'NftMutableMetaData',
+                        description: nftData.description,
+                        image: "wxr72yjs3lvvc5r3fjygr4rb",
+                        imageData: null,
+                        uri: nftData.uri,
+                        bagId: BigInt('0xBA53CDEB0361AE63213FD0C3E9909EF7E8BFEAEBEBB53B90731714ABCB39FB07')
+                    }
+                }
+            );
+            const nftData3 = await nftItem.getGetNftData();
+            const nftContent3 =  await petsCollection.getGetNftContent(nftData3.index, nftData3.individualContent);
+            const attributes3 = await decodeNftMetadata(nftContent3);
+            expect(attributes3.image).toBe('https://muratov.xyz/nftorrent/c/EQDs20APIYzlEyCogFQRtBOX9tilxYBx3G50SDkHIlvr-Nuw');
         }
     });    
 

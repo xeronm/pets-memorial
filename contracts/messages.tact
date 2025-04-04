@@ -1,4 +1,4 @@
-const MintPetMemoryNftGasFeeMin: Int = ton("0.014");
+const MintPetMemoryNftGasFeeMin: Int = ton("0.015");
 const MintPetMemoryNftFwdFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasAndFwdFeeMin: Int = MintPetMemoryNftFwdFeeMin + PetMemoryNftTransferGasFeeMin;
@@ -43,6 +43,9 @@ struct PetMemoryNftImmutableData {
                          // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
     countryCode: Int as uint10; // ISO 3166-1 alpha-2 code, e.g. "ru"; encoded as 5bits for every letter,
                                 // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
+    geoPoint: Int? as uint48; // Geographical Point information with accuracy of 3m, coded in accordance of 3GPP TS 23.033 6.1. Point. 
+                            // First 24-bits for Latitude: 1 bit for hemisphere, 23 bits - N and X - degrees of latitude, where N < (2^23 * X / 90) < N+1
+                            // Last 24-bits for Longitude, 24 bits - N and X - degrees of longitude, where N < (2^24 * X / 360) < N+1
     location: String?; // It's preferred to use Postal Code
     birthDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0x00 - means unspecified or unknown
     deathDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0x00 - means unspecified or unknown
