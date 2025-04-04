@@ -10,7 +10,8 @@ const nftDataImageOffChain: NftMutableMetaData = {
   uri: null,
   image: 'https://upload.wikimedia.org/wikipedia/en/0/0c/Linkin_Park_Meteora_Album_Cover.jpg',
   imageData: null,
-  description: "On-chain overriden description"
+  description: "On-chain overriden description",
+  bagId: BigInt('0xBA53CDEB0361AE63213FD0C3E9909EF7E8BFEAEBEBB53B90731714ABCB39FB07')
 }
 
 const nftData = nftDataImageOffChain;
@@ -34,7 +35,6 @@ export async function run(provider: NetworkProvider, args: string[]) {
     },
     {
       $$type: 'EditContent',
-      queryId: 0n,
       data: nftData
     }
   );
