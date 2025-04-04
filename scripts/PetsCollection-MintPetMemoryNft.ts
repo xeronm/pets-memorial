@@ -53,7 +53,7 @@ const nftDataImageOffChain2: NftMutableMetaData = {
   bagId: null,
 }
 
-const nftData = nftDataImageOnChain;
+const nftData = nftDataImageOffChain1;
 
 const nftImmData: PetMemoryNftImmutableData = {
   $$type: 'PetMemoryNftImmutableData',
@@ -65,7 +65,7 @@ const nftImmData: PetMemoryNftImmutableData = {
   lang: 0x8Dn,         // "en"
   countryCode: 0x234n, // "ru"
   location: 'Krasnodar 350020',
-  geoPoint: null,
+  geoPoint: 0x4010d91bb866n, // 45,046284 [N1=4198617], 38,981700 [N2=1816678] 
   birthDate: 0n,
   deathDate: 0x20241115n,
 }
