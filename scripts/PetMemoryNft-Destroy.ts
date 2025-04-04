@@ -22,7 +22,9 @@ export async function run(provider: NetworkProvider, args: string[]) {
     {
       value: toNano('0.01'),
     },
-    'Destroy'  
+    {
+      $$type: 'Destroy'
+    }
   );
 
   let isDeployed = await provider.isContractDeployed(address);

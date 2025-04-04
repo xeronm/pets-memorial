@@ -1,7 +1,17 @@
 import { Address } from '@ton/core';
 import { PetsCollection } from '../wrappers/PetsCollection';
 import { NetworkProvider } from '@ton/blueprint';
+// import axios from 'axios';
 
+// axios.interceptors.request.use(request => {
+//   console.log('Starting Request', request.url, JSON.stringify(request.data, null, 2))
+//   return request
+// })
+    
+// axios.interceptors.response.use(response => {
+//   console.log('Response:', response.config.url, JSON.stringify(response.data, null, 2))
+//   return response
+// })
 
 export async function run(provider: NetworkProvider, args: string[]) {
   const ui = provider.ui();

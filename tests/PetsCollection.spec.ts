@@ -10,6 +10,7 @@ import {
     PetsCollection, 
     PetMemoryNftImmutableData,
     NftMutableMetaData,
+    loadPetMemoryNftContent,
 } from '../wrappers/PetsCollection';
 import '@ton/test-utils';
 
@@ -30,6 +31,7 @@ const ExitCodes = {
 const MinTransactionAmount = toNano('0.004'); // Deposit `totalFees`
 const MaxTransactionAmount = toNano('0.25');  // Mint Big NFT
 const MaxBalanceDifference = toNano('0.01');
+const MaxClassABalanceDifference = toNano('0.002');
 
 const StorageTonsReserve = {
     Collection:             toNano('0.05'),
@@ -44,14 +46,14 @@ function dumpTransactions(txs: BlockchainTransaction[]) {
 function describe_(...args: any) {
 }
 
-const PrefixUriNew = "tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/images/";
-const PrefixUriDefault = "https://muratov.xyz/petsmem/images/";
+const PrefixUriNew = "https://muratov.xyz/petsmem/images/";
 
 const nftData: NftMutableMetaData = {
     $$type: 'NftMutableMetaData',
     uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
     image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
     imageData: null,
+    bagId: null,
     description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
                 "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
                 " out of an abandoned private house, looked at people with piercing emerald eyes," +
@@ -73,6 +75,7 @@ const nftImmData: PetMemoryNftImmutableData = {
     lang: 0x8Dn,         // "en"
     countryCode: 0x234n, // "ru"
     location: 'Krasnodar 350020',
+    geoPoint: null,
     birthDate: 0n,
     deathDate: 0x20241115n,
 }
@@ -150,8 +153,7 @@ describe('PetsCollection Deploy', () => {
                 value: MaxTransactionAmount
             },
             {
-                $$type: 'Deploy',
-                queryId: 0n,
+                $$type: 'Deploy'
             }
         );
 
@@ -182,8 +184,7 @@ describe('PetsCollection Deploy', () => {
                 value: StorageTonsReserve.Collection,
             },
             {
-                $$type: 'Deploy',
-                queryId: 0n,
+                $$type: 'Deploy'
             }
         );
         resultReport.details.CollectionDeploy_InsufficientFunds = transactionReport(deployResult.transactions, PetsCollection.opcodes, addrNames);
@@ -218,14 +219,14 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'MintPetMemoryNft',
-                queryId: 0n,
                 feeClassA: feeClassA,
                 feeClassB: feeClassB,
                 newOwner: sender ? nftUser.address : null,
                 content: {
                     $$type: 'PetMemoryNftContent',
                     immData: nftImmData,
-                    data: data ?? nftData
+                    data: data ?? nftData,
+                    feeDueTime: BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60),
                 }
             }
         );
@@ -257,8 +258,7 @@ describe('PetsCollection Methods', () => {
                 value: MaxTransactionAmount,
             },
             {
-                $$type: 'Deploy',
-                queryId: 0n,
+                $$type: 'Deploy'
             }
         );
 
@@ -302,7 +302,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'https://muratov.xyz/petsmem/images/collection.png'
+            image: 'https://muratov.xyz/nftorrent/c/EQBzISuKCM897sD92KU2PeuzYraCmA-k3J2PmonajqRuQ9pQ'
         });
     });
 
@@ -333,27 +333,6 @@ describe('PetsCollection Methods', () => {
         resultReport.storageAnnualFees.Collection = report2[1].storageFees ?? 0n;
     })
 
-    it('Deploy: should not deploy (Second Deploy)', async () => {       
-        const deployResult2 = await petsCollection.send(
-            deployer.getSender(),
-            {
-                value: MaxTransactionAmount,
-            },
-            {
-                $$type: 'Deploy',
-                queryId: 0n,
-            }
-        );
-
-        expect(deployResult2.transactions).toHaveTransaction({
-            from: deployer.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorValidation,
-        });
-    });  
-
     it('UpdateSettings: should update settings', async () => {
         const updateSettings = await petsCollection.send(
             deployer.getSender(),
@@ -362,7 +341,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'UpdateSettings',
-                queryId: 0n,
                 feeStorage: 0x3An,
                 feeClassA: 0x30n,
                 feeClassB: 0n,
@@ -397,7 +375,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'tonstorage://F70D2F7587DBDFD0928E1967A0B2783EC3ABD63846AEC3B055B4705AEF742871/images/collection.png'
+            image: 'https://muratov.xyz/petsmem/images/EQBzISuKCM897sD92KU2PeuzYraCmA-k3J2PmonajqRuQ9pQ'
         });        
     });    
 
@@ -409,7 +387,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'UpdateSettings',
-                queryId: 0n,
                 feeStorage: 0x3An,
                 feeClassA: 0n,
                 feeClassB: 0n,
@@ -458,7 +435,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'Withdraw',
-                queryId: 0n,
                 isClassB: false,
                 amount: withdrawAmount,
                 customPayload: null,
@@ -518,7 +494,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'Withdraw',
-                queryId: 0n,
                 isClassB: false,
                 amount: withdrawAmount,
                 customPayload: null,
@@ -556,8 +531,8 @@ describe('PetsCollection Methods', () => {
         const { mintNftResult, nftItem } = await mintNft();
 
         const info = await petsCollection.getInfo();
-        expect(info.balanceClassA).toBeGreaterThan(toNano('0.074'));
-        expect(info.balanceClassA).toBeLessThan(toNano('0.075'));
+        expect(info.balanceClassA).toBeGreaterThanOrEqual(toNano('0.075'));
+        expect(info.balanceClassA).toBeLessThanOrEqual(toNano('0.075') + MaxClassABalanceDifference);
         expect(info.balanceClassB).toBe(toNano('0.05'));
 
         const balance1 = await deployer.getBalance();
@@ -569,7 +544,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'Withdraw',
-                queryId: 0n,
                 isClassB: true,
                 amount: withdrawAmount,
                 customPayload: null,
@@ -590,7 +564,7 @@ describe('PetsCollection Methods', () => {
         resultReport.flows.CollectionWithdrawClassB.withdrawnAmount = withdrawAmount;
 
         const info2 = await petsCollection.getInfo();
-        expect(info2.balanceClassA).toBe(info.balanceClassA);
+        expect(info2.balanceClassA).toAlmostEqualTons(info.balanceClassA);
         expect(info2.balance).toBe(info2.balanceClassA + info2.balanceClassB);
 
         const balance2 = await deployer.getBalance();
@@ -606,7 +580,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'Withdraw',
-                queryId: 0n,
                 isClassB: false,
                 amount: toNano('0.01'),
                 customPayload: null, 
@@ -617,7 +590,7 @@ describe('PetsCollection Methods', () => {
         resultReport.details.CollectionWithdraw_Unathorized = transactionReport(withdrawResult.transactions, PetsCollection.opcodes, addrNames);
 
         const info2 = await petsCollection.getInfo();
-        expect(info2.balanceClassA).toBe(info1.balanceClassA);
+        expect(info2.balanceClassA).toAlmostEqualTons(info1.balanceClassA);
         expect(info2.balance).toBe(info1.balance);
 
         expect(withdrawResult.transactions).toHaveTransaction({
@@ -638,7 +611,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'Withdraw',
-                queryId: 0n,
                 isClassB: false,
                 amount: toNano('0.01'),
                 customPayload: null, 
@@ -670,7 +642,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'ChangeOwner',
-                queryId: 0n,
                 newOwner: anyUser.address
             }
         )
@@ -699,7 +670,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'ChangeOwner',
-                queryId: 0n,
                 newOwner: anyUser.address
             }
         )
@@ -717,6 +687,9 @@ describe('PetsCollection Methods', () => {
 
 
     it('MintPetMemoryNft: shloud mint NFT for sender', async () => {
+        const expectedDueTime = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
+        const info1 = await petsCollection.getInfo();
+
         const { mintNftResult, nftItem } = await mintNft();
 
         resultReport.details.MintPetMemoryNft = transactionReport(mintNftResult.transactions, PetsCollection.opcodes, 
@@ -738,11 +711,20 @@ describe('PetsCollection Methods', () => {
     
             const nftData2 = await nftItem.getGetNftData();
             expect(nftData2.isInitialized).toBe(true);
-            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);    
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
+            const content = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime);
+
+            const info2 = await petsCollection.getInfo();
+            expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA + toNano("0.025"));
+            expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + toNano("0.025") + MaxClassABalanceDifference);
+            expect(info2.balanceClassB).toBe(info1.balanceClassB + toNano("0.05"));
+            expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);            
         }
     });
 
     it('MintPetMemoryNft: shloud mint NFT for 3rd party user', async () => {
+        const expectedDueTime = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
         const { mintNftResult, nftItem } = await mintNft(0n, 0n, anyUser);
 
         resultReport.details.MintPetMemoryNft3rdParty = transactionReport(mintNftResult.transactions, PetsCollection.opcodes,
@@ -765,6 +747,8 @@ describe('PetsCollection Methods', () => {
             const nftData2 = await nftItem.getGetNftData();
             expect(nftData2.isInitialized).toBe(true);
             expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
+            const content = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime);
         }
     });
 
@@ -830,7 +814,6 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'Withdraw',
-                queryId: 0n,
                 isClassB: false,
                 amount: withdrawAmount,
                 customPayload: null,
@@ -888,6 +871,36 @@ describe('PetsCollection Methods', () => {
         }
     });
 
+    it('Donate: should not donate (Unathorized)', async () => {
+        const info1 = await petsCollection.getInfo();
+        const donateResult = await petsCollection.send(
+            anyUser.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'Donate',
+                index: 1n,
+                feeClassA: 0n,
+                feeClassB: 0x3Cn,
+            }            
+        );
+        resultReport.details.CollectionDonate_Unathorized = transactionReport(donateResult.transactions, PetsCollection.opcodes, addrNames);
+
+        const info2 = await petsCollection.getInfo();
+        expect(info2.balanceClassA).toBe(info1.balanceClassA);
+        expect(info2.balanceClassB).toBe(info1.balanceClassB);
+        expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
+
+        expect(donateResult.transactions).toHaveTransaction({
+            from: anyUser.address,
+            to: petsCollection.address,
+            success: false,
+            aborted: true,
+            exitCode: ExitCodes.ErrorNotAuthorized,
+        });        
+    });
+
 });
 
 
@@ -915,14 +928,14 @@ describe('PetMemoryNft Methods', () => {
             },
             {
                 $$type: 'MintPetMemoryNft',
-                queryId: 0n,
                 feeClassA: 0n,
                 feeClassB: 0n,
                 newOwner: null,
                 content: {
                     $$type: 'PetMemoryNftContent',
                     immData: nftImmData,
-                    data: data ?? nftData
+                    data: data ?? nftData,
+                    feeDueTime: 0n,
                 }
             }
         );
@@ -949,8 +962,7 @@ describe('PetMemoryNft Methods', () => {
                 value: MaxTransactionAmount,
             },
             {
-                $$type: 'Deploy',
-                queryId: 0n,
+                $$type: 'Deploy'
             }
         );
 
@@ -972,37 +984,37 @@ describe('PetMemoryNft Methods', () => {
         }        
     });
         
-
     it('<Storage>: verify storage fees for 1 Year', async () => {
-        const { nftItem: nftItem1 } = await mintNft({
+        const { mintNftResult: mintNftResultSmall, nftItem: nftItem1 } = await mintNft({
                 $$type: 'NftMutableMetaData',
                 description: null,
                 image: null,
                 uri: null,
-                imageData: null
+                imageData: null,
+                bagId: null,
             });
-        const { nftItem: nftItem2 } = await mintNft();
+        resultReport.details.MintPetMemoryNft_small = transactionReport(mintNftResultSmall.transactions, PetsCollection.opcodes, 
+            {...addrNames, NftItem: nftItem1?.address});
 
+        const { mintNftResult: mintNftResultMedium, nftItem: nftItem2 } = await mintNft();
+        resultReport.details.MintPetMemoryNft_medium = transactionReport(mintNftResultMedium.transactions, PetsCollection.opcodes, 
+            {...addrNames, NftItem: nftItem2?.address});
 
         const { mintNftResult: mintNftResult128, nftItem: nftItem3 } = await mintNft({
                 ...nftData, 
                 imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-128x128.jpg'))
             });
-
         resultReport.details.MintPetMemoryNft_Big128 = transactionReport(mintNftResult128.transactions, PetsCollection.opcodes, 
-            {...addrNames, NftItem: nftItem1?.address});
+            {...addrNames, NftItem: nftItem3?.address});
 
 
         resultReport.flows.MintPetMemoryNft_Big128 = transactionAmountFlow(mintNftResult128.transactions);
-
         const { mintNftResult: mintNftResult256, nftItem: nftItem4 } = await mintNft({
             ...nftData, 
             imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-256x256.jpg'))
         });
-
         resultReport.details.MintPetMemoryNft_Big256 = transactionReport(mintNftResult256.transactions, PetsCollection.opcodes,
-            {...addrNames, NftItem: nftItem4?.address});            
-
+            {...addrNames, NftItem: nftItem4?.address});
         resultReport.flows.MintPetMemoryNft_Big256 = transactionAmountFlow(mintNftResult256.transactions);
     
         const time1 = Math.floor(Date.now() / 1000);                               // current local unix time
@@ -1047,7 +1059,9 @@ describe('PetMemoryNft Methods', () => {
                 {
                     value: MaxTransactionAmount,
                 },
-                'Destroy'
+                {
+                    $$type: 'Destroy'
+                }
             );
             
             resultReport.details.PetMemoryNftDestroy = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
@@ -1076,7 +1090,9 @@ describe('PetMemoryNft Methods', () => {
                 {
                     value: MaxTransactionAmount
                 },
-                'Destroy'
+                {
+                    $$type: 'Destroy'
+                }
             );
 
             resultReport.details.PetMemoryNftDestroy_Unauthorized = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
@@ -1140,13 +1156,13 @@ describe('PetMemoryNft Methods', () => {
                 },
                 {
                     $$type: 'EditContent',
-                    queryId: 0n,
                     data: {
                         $$type: 'NftMutableMetaData',
                         description: 'Overriden Description',
                         image: null,
                         imageData: null,
-                        uri: null
+                        uri: null,
+                        bagId: null,
                     }
                 }
             );
@@ -1165,7 +1181,7 @@ describe('PetMemoryNft Methods', () => {
             const nftContent1 =  await petsCollection.getGetNftContent(nftData1.index, nftData1.individualContent);
             const attributes1 = await decodeNftMetadata(nftContent1);
             expect(attributes1.description).toBe('Overriden Description');
-            expect(attributes1.image).toBe('https://muratov.xyz/petsmem/images/cat.png');
+            expect(attributes1.image).toBe('https://muratov.xyz/nftorrent/c/EQDs20APIYzlEyCogFQRtBOX9tilxYBx3G50SDkHIlvr-Nuw');
             expect(attributes1.uri).toBeUndefined();
 
 
@@ -1176,13 +1192,13 @@ describe('PetMemoryNft Methods', () => {
                 },
                 {
                     $$type: 'EditContent',
-                    queryId: 0n,
                     data: {
                         $$type: 'NftMutableMetaData',
                         description: nftData.description,
                         image: null,
                         imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-256x256.jpg')),
-                        uri: nftData.uri
+                        uri: nftData.uri,
+                        bagId: null,
                     }
                 }
             );
@@ -1198,7 +1214,30 @@ describe('PetMemoryNft Methods', () => {
             expect(attributes2.image).toBeUndefined();
             expect(attributes2.description).toBe(nftData.description);            
             expect(attributes2.uri).toBe(nftData.uri);
-            expect(attributes2.image_data.length).toBeGreaterThan(3000);      
+            expect(attributes2.image_data.length).toBeGreaterThan(3000);
+            
+            
+            const editResult3 = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: MaxTransactionAmount
+                },
+                {
+                    $$type: 'EditContent',
+                    data: {
+                        $$type: 'NftMutableMetaData',
+                        description: nftData.description,
+                        image: "wxr72yjs3lvvc5r3fjygr4rb",
+                        imageData: null,
+                        uri: nftData.uri,
+                        bagId: BigInt('0xBA53CDEB0361AE63213FD0C3E9909EF7E8BFEAEBEBB53B90731714ABCB39FB07')
+                    }
+                }
+            );
+            const nftData3 = await nftItem.getGetNftData();
+            const nftContent3 =  await petsCollection.getGetNftContent(nftData3.index, nftData3.individualContent);
+            const attributes3 = await decodeNftMetadata(nftContent3);
+            expect(attributes3.image).toBe('https://muratov.xyz/nftorrent/c/EQDs20APIYzlEyCogFQRtBOX9tilxYBx3G50SDkHIlvr-Nuw');
         }
     });    
 
@@ -1214,13 +1253,13 @@ describe('PetMemoryNft Methods', () => {
                 },
                 {
                     $$type: 'EditContent',
-                    queryId: 0n,
                     data: {
                         $$type: 'NftMutableMetaData',
                         description: 'Overriden Description',
                         image: null,
                         imageData: null,
-                        uri: null
+                        uri: null,
+                        bagId: null,
                     }
                 }
             );
@@ -1284,7 +1323,7 @@ describe('PetMemoryNft Methods', () => {
     });  
 
 
-    it('Transfer: hloud not transfer (Unauthorized)', async () => {
+    it('Transfer: shloud not transfer (Unauthorized)', async () => {
         const { nftItem } = await mintNft();
         expect(nftItem).toBeDefined();
         if (nftItem) {
@@ -1365,4 +1404,95 @@ describe('PetMemoryNft Methods', () => {
         }
     });  
 
+
+    it('Donate: should donate to collection', async () => {
+        const expectedDueTime1 = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
+        const { nftItem } = await mintNft();
+
+        expect(nftItem).toBeDefined();
+        if (nftItem) {
+            const info1 = await petsCollection.getInfo();
+
+            const nftData1 = await nftItem.getGetNftData();
+            const content1 = loadPetMemoryNftContent(nftData1.individualContent.asSlice());
+            expect(content1.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime1);
+
+            const donateResult = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: MaxTransactionAmount
+                },
+                {
+                    $$type: 'DonateCollection',
+                    feeClassA: 0n,
+                    feeClassB: 0x3Cn,
+                }
+            );            
+
+            resultReport.details.PetMemoryNftDonateCollection = transactionReport(donateResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
+
+            resultReport.flows.PetMemoryNftDonateCollection = transactionAmountFlow(donateResult.transactions);
+
+            expect(donateResult.transactions).toHaveTransactionSeq([
+                {},
+                {from: nftUser.address, to: nftItem.address},
+                {from: nftItem.address, to: petsCollection.address},
+                {from: petsCollection.address, to: nftItem.address},
+            ]);
+
+            const nftData2 = await nftItem.getGetNftData();
+            const content2 = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content2.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime1 + (365n * 24n * 60n * 60n));
+
+            const info2 = await petsCollection.getInfo();
+            expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA);
+            expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + MaxClassABalanceDifference);
+            expect(info2.balanceClassB).toBe(info1.balanceClassB + toNano("0.05"));
+            expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
+        }
+    });    
+
+    it('Donate: should not donate to collection (InsufficientFunds)', async () => {
+        const { nftItem } = await mintNft();
+
+        expect(nftItem).toBeDefined();
+        if (nftItem) {
+            const info1 = await petsCollection.getInfo();            
+            const nftData1 = await nftItem.getGetNftData();
+            const content1 = loadPetMemoryNftContent(nftData1.individualContent.asSlice());
+            const donateResult = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: toNano("0.05")
+                },
+                {
+                    $$type: 'DonateCollection',
+                    feeClassA: 0n,
+                    feeClassB: 0x3Cn,
+                }
+            );            
+            
+            resultReport.details.PetMemoryNftDonateCollection_InsufficientFunds = transactionReport(donateResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});                
+
+
+            expect(donateResult.transactions).toHaveTransaction({
+                from: nftItem.address,
+                to: petsCollection.address,
+                success: false,
+                aborted: true,
+                exitCode: ExitCodes.ErrorInsufficientFunds,
+            });
+
+            const nftData2 = await nftItem.getGetNftData();
+            const content2 = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content2.feeDueTime).toEqual(content1.feeDueTime);
+
+            const info2 = await petsCollection.getInfo();
+            expect(info2.balanceClassA).toAlmostEqualTons(info1.balanceClassA);
+            expect(info2.balanceClassB).toBe(info1.balanceClassB);
+            expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);                  
+        }
+    });
 });

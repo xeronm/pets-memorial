@@ -1,4 +1,3 @@
-import "@stdlib/deploy";
 import "./imports/utils.fc";
 import "./messages.tact";
 import "./pet_memory_nft.tact";
@@ -22,39 +21,11 @@ const FieldName: Int = sha256("name");
 const FieldDescription: Int = sha256("description");
 const FieldImage: Int = sha256("image");
 const FieldImageData: Int = sha256("image_data");
-const FieldAttributes: Int = sha256("attributes");
-const FieldTraitType: Int = sha256("trait_type");
-const FieldValue: Int = sha256("value");
 
 const PetsCollectionName: String = "Test Collection";
 const PetsCollectionDescription: String = "Test Collection Description";
-const AuthClassADescription: String = "Class A Token";
-const AuthClassBDescription: String = "Class B Token";
+const DefaultPrefixUri: String = "https://muratov.xyz/nftorrent/c/";
 
-// const PetsCollectionName: String = "Pets Memorial";
-// const PetsCollectionDescription: String = "TestNet Pets Memorial";
-// const AuthClassADescription: String = "Auth Governance Token";
-// const AuthClassBDescription: String = "Auth Non-governance Token";
-
-const PetsCollectionImage: String = "collection.png";
-const AuthClassAName: String = "Class A";
-const AuthClassAImage: String = "classA.png";
-const AuthClassBName: String = "Class B";
-const AuthClassBImage: String = "classB.png";
-const ImageCat: String = "cat.png";
-const ImageDog: String = "dog.png";
-const ImageOther: String = "other.png";
-const DefaultPrefixUri: String = "https://muratov.xyz/petsmem/images/";
-
-inline fun speciesToImage(species: Int): String {
-    if (species == 1) {
-        return ImageDog;
-    }
-    else if (species == 2) {
-        return ImageCat
-    } 
-    return ImageOther;
-}
 
 fun encodeNftMetadataContent(name: String, uri: String?, description: String?, image: String?, imageData: Cell?): Cell {
     let dict: map<Int as uint256, Cell> = emptyMap();
@@ -90,45 +61,29 @@ contract PetsCollection {
     owner: Address;
     // Mutable Internal Attributes
     // - Minting data
-    nftIndexSeq: Int as uint40;
+    nftIndexSeq: Int as uint40 = 1;
     // - Balances
-    balanceClassAWithdrawn: Int as coins;
-    balanceClassBWithdrawn: Int as coins;
-    balanceClassB: Int as coins;
+    balanceClassAWithdrawn: Int as coins = 0;
+    balanceClassBWithdrawn: Int as coins = 0;
+    balanceClassB: Int as coins = 0;
     // Mutable Settings
     // - Fees
-    feeStorage: Int as uint8;
-    feeClassA: Int as uint8;
-    feeClassB: Int as uint8;    
+    feeStorage: Int as uint8 = 0x3C;  // 0.05 TON
+    feeClassA: Int as uint8 = 0x3A; // 0.025 TON
+    feeClassB: Int as uint8 = 0x3C; // 0.05 TON
     //
-    prefixUri: String;
+    prefixUri: String = DefaultPrefixUri;
 
     init(owner: Address) {
         self.owner = owner;
-        //
-        self.nftIndexSeq = 0;
-        // 
-        self.feeStorage = 0x3C;  // 0.05 TON
-        self.feeClassA = 0x3A; // 0.025 TON
-        self.feeClassB = 0x3C; // 0.05 TON
-        // 
-        self.balanceClassAWithdrawn = 0;
-        self.balanceClassBWithdrawn = 0;
-        self.balanceClassB = 0;
-        //
-        self.prefixUri = DefaultPrefixUri;
+        // self.prefixUri = DefaultPrefixUri;
     }
 
     receive() {        
     }
 
-
     receive(msg: Deploy) {
-        require(sender() == self.owner, "ErrorNotAuthorized");
-        require(self.nftIndexSeq == 0, "ErrorValidation");
-
-        self.nftIndexSeq = 1;
-        self.notify(DeployOk{queryId: msg.queryId}.toCell());
+        self.notify(null);
     }
 
     receive(msg: MintPetMemoryNft) {
@@ -138,11 +93,11 @@ contract PetsCollection {
         let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
         let feeClassB: Int = unpackQint(max(msg.feeClassB, self.feeClassB)); 
         let ctx = context();
-        let fwdFee: Int = ctx.readForwardFee();
+        let fwdFee: Int = ctx.readForwardFee(); // we use fwdFee to estimate deploy message fee
 
-        let remainingValue = ctx.value - (feeClassA + feeClassB + fwdFee + MintPetMemoryNftOutFwdFeeMin);
+        let remainingValue = ctx.value - (feeClassA + feeClassB + MintPetMemoryNftGasFeeMin);
         // All fees (storage, compute, forward) are deducted from main, Class A balance.
-        require(remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasFee, "ErrorInsufficientFunds");
+        require(remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasAndFwdFeeMin, "ErrorInsufficientFunds");
 
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), self.nftIndexSeq);
         self.nftIndexSeq += 1;
@@ -153,7 +108,7 @@ contract PetsCollection {
             bounce: true,
             mode: SendDefaultMode,
             body: Transfer{
-                queryId: msg.queryId,
+                queryId: 0,
                 newOwner: (msg.newOwner == null) ? sender() : msg.newOwner!!,
                 responseDestination: sender(),
                 forwardAmount: 0,
@@ -162,12 +117,36 @@ contract PetsCollection {
                     immData: msg.content.immData,
                     data: msg.content.data,
                     storageReserve: self.feeStorage,
+                    feeDueTime: now() + (feeClassB * SecondsInYear) / unpackQint(self.feeClassB)
                 }.toCell(),
             }.toCell(),
             init: nftInit
         });
     }
 
+    receive(msg: Donate) {
+        let nftInit: StateInit = initOf PetMemoryNft(myAddress(), msg.index);
+        require(sender() == contractAddress(nftInit), "ErrorNotAuthorized");
+
+        let feeClassA: Int = unpackQint(max(msg.feeClassA, MinFeeClassA));
+        let feeClassB: Int = unpackQint(msg.feeClassB);
+
+        let ctx = context();
+        let remainingValue = ctx.value - (feeClassA + feeClassB + DonateGasFeeMin);
+        require(remainingValue >= DonateReplyGasFeeMin, "ErrorInsufficientFunds");
+
+        self.balanceClassB += feeClassB;
+
+        message(MessageParameters{
+            to: sender(),
+            value: remainingValue,
+            mode: SendDefaultMode,
+            bounce: false,
+            body: DonateReply{
+                feeDueTimeAdd: (feeClassB * SecondsInYear) / unpackQint(self.feeClassB)
+            }.toCell()
+        });
+    }
 
     receive(msg: Withdraw) {
         require(sender() == self.owner, "ErrorNotAuthorized");
@@ -189,7 +168,6 @@ contract PetsCollection {
                 value: msg.amount,
                 mode: 0,
                 body:  WithdrawForward{
-                    queryId: msg.queryId,
                     forwardPayload: msg.forwardPayload,
                 }.toCell()
             });
@@ -201,7 +179,6 @@ contract PetsCollection {
             value: needFwd ? 0 : msg.amount,
             mode: SendRemainingValue,
             body: WithdrawResult{
-                queryId: msg.queryId,
                 isClassB: msg.isClassB,
                 balanceWithdrawn: msg.isClassB ? self.balanceClassBWithdrawn : self.balanceClassAWithdrawn,
                 customPayload: msg.customPayload,
@@ -229,13 +206,12 @@ contract PetsCollection {
         cashback(sender());        
     }
 
-
     get fun get_collection_data(): CollectionData {
         let content: Cell = encodeNftMetadataContent(
             PetsCollectionName, 
             null,
             PetsCollectionDescription,
-            makeUri(self.prefixUri, PetsCollectionImage),
+            makeUri(self.prefixUri, myAddress().toString()),
             null,            
         );
 
@@ -289,8 +265,9 @@ contract PetsCollection {
         }
         image = content.data.image;
         imageData = content.data.imageData;
-        if (image == null && imageData == null) {
-            image = makeUri(self.prefixUri, speciesToImage(content.immData.species));
+        if ((image == null || content.data.bagId != null) && imageData == null) {
+            let nftInit: StateInit = initOf PetMemoryNft(myAddress(), index);
+            image = makeUri(self.prefixUri, contractAddress(nftInit).toString());
         }
     
         return encodeNftMetadataContent(
@@ -323,10 +300,7 @@ contract PetsCollection {
         if (!isClassB) {
             amount = balance - amount;
         }
-        if (amount > balance - self.storageReserve) {
-            amount = balance - self.storageReserve;
-        }
-        return amount;
+        return min(amount, balance - self.storageReserve);
     }
 
 }

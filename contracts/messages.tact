@@ -1,5 +1,12 @@
-const MintPetMemoryNftOutFwdFeeMin: Int = ton("0.008");
-const PetMemoryNftTransferGasFee: Int = ton("0.01");
+const MintPetMemoryNftGasFeeMin: Int = ton("0.015");
+const MintPetMemoryNftFwdFeeMin: Int = ton("0.01");
+const PetMemoryNftTransferGasFeeMin: Int = ton("0.01");
+const PetMemoryNftTransferGasAndFwdFeeMin: Int = MintPetMemoryNftFwdFeeMin + PetMemoryNftTransferGasFeeMin;
+
+const DonateGasFeeMin: Int = ton("0.007");
+const DonateReplyGasFeeMin: Int = ton("0.008");
+
+const SecondsInYear: Int = 31536000; // 365 * 24 * 60 * 60 
 
 const MinFeeStorage: Int = 0x38; // 0.01 TON
 const MinFeeClassA: Int = 0x30; // 0.001 TON
@@ -24,6 +31,8 @@ fun speciesToName(species: Int): String {
     return "";
 }
 
+
+// Common Structures
 struct PetMemoryNftImmutableData {
     species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3... - reserved;
     name: String;
@@ -34,22 +43,30 @@ struct PetMemoryNftImmutableData {
                          // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
     countryCode: Int as uint10; // ISO 3166-1 alpha-2 code, e.g. "ru"; encoded as 5bits for every letter,
                                 // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
+    geoPoint: Int? as uint48; // Geographical Point information with accuracy of 3m, coded in accordance of 3GPP TS 23.033 6.1. Point. 
+                            // First 24-bits for Latitude: 1 bit for hemisphere, 23 bits - N and X - degrees of latitude, where N < (2^23 * X / 90) < N+1
+                            // Last 24-bits for Longitude, 24 bits - N and X - degrees of longitude, where N < (2^24 * X / 360) < N+1
     location: String?; // It's preferred to use Postal Code
     birthDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0x00 - means unspecified or unknown
     deathDate: Int as uint32; // 4 octets - year; 2 Octets - month; 2 octets - day; 0x00 - means unspecified or unknown
 }
 
-message Excesses {
-    queryId: Int as uint64;
+struct NftMutableMetaData {
+    bagId: Int? as uint256;
+    uri: String?;
+    description: String?;
+    image: String?;
+    imageData: Cell?;
 }
 
-message ChangeOwner {
-    queryId: Int as uint64;
+message Deploy {}
+
+// PetCollections Contract
+message(0x819dbe99) ChangeOwner {
     newOwner: Address;
 }
 
 message(0x4219f222) UpdateSettings {
-    queryId: Int as uint64;
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
@@ -57,7 +74,6 @@ message(0x4219f222) UpdateSettings {
 }
 
 message(0xa77a7982) Withdraw {
-    queryId: Int as uint64;
     isClassB: Bool;
     amount: Int as coins;
     customPayload: Cell?;
@@ -65,52 +81,57 @@ message(0xa77a7982) Withdraw {
     forwardPayload: Slice as remaining;
 }
 
-message WithdrawForward {
-    queryId: Int as uint64;
+message(0x19e2ce21) WithdrawForward {
     forwardPayload: Slice as remaining;
 } 
 
-message WithdrawResult {
-    queryId: Int as uint64;
+message(0xeaf4673d) WithdrawResult {
     isClassB: Bool;    
     balanceWithdrawn: Int as coins;
     customPayload: Cell?;
 } 
 
 message(0x399987e2) MintPetMemoryNft {
-    queryId: Int as uint64;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
     newOwner: Address?;
     content: PetMemoryNftContent;
 }
 
+message Donate {
+    index: Int as uint40;
+    feeClassA: Int as uint8;
+    feeClassB: Int as uint8;
+}
 
-// PetMemoryNft Producer
+message DonateReply {
+    feeDueTimeAdd: Int as uint32;
+}
+
+// PetMemoryNft Contract
 struct PetMemoryNftContent {
     immData: PetMemoryNftImmutableData;
     data: NftMutableMetaData;
+    feeDueTime: Int as uint32;
 }
 
 struct PetMemoryNftInit {
     immData: PetMemoryNftImmutableData;
     data: NftMutableMetaData;
     storageReserve: Int as uint8;
+    feeDueTime: Int as uint32;
 }
 
-// NFT Collection Interface
-struct CollectionData {
-    nextItemIndex: Int;
-    collectionContent: Cell;
-    ownerAddress: Address;
+message DonateCollection {
+    feeClassA: Int as uint8;
+    feeClassB: Int as uint8;    
 }
 
-// NFT Item Interface
-struct NftMutableMetaData {
-    uri: String?;
-    description: String?;
-    image: String?;
-    imageData: Cell?;
+message Destroy {}
+
+// NFT Item nad NFT Collection TEP-62 Interface
+message(0x7e208cb4) Excesses {
+    queryId: Int as uint64;
 }
 
 message(0x5fcc3d14) Transfer {
@@ -129,7 +150,6 @@ message(0x05138d91) OwnershipAssigned {
 }
 
 message(0x1a0b9d51) EditContent {
-    queryId: Int as uint64;
     data: NftMutableMetaData;
 }
 
@@ -149,4 +169,10 @@ struct GetNftData {
     collectionAddress: Address;
     ownerAddress: Address;
     individualContent: Cell;
+}
+
+struct CollectionData {
+    nextItemIndex: Int;
+    collectionContent: Cell;
+    ownerAddress: Address;
 }

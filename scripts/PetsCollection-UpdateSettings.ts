@@ -4,7 +4,6 @@ import { NetworkProvider, sleep } from '@ton/blueprint';
 
 const NewSettings: UpdateSettings = {
   $$type: 'UpdateSettings',
-  queryId: 0n,
   feeStorage: 0x39n,
   feeClassA: 0x39n,
   feeClassB: 0x39n,

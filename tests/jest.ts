@@ -1,7 +1,8 @@
 import { BlockchainTransaction } from '@ton/sandbox';
 import { flattenTransaction } from '@ton/test-utils/dist/test/transaction';
 import { fromNano, Address, Cell } from '@ton/core';
-import { kMaxLength } from 'buffer';
+import { Matchers } from "@jest/expect";
+
 
 export type TransactionDesc = {
     totalFeesLower?: bigint,
@@ -217,11 +218,26 @@ function toHaveTransactionSeq(subject: BlockchainTransaction[], cmp: Transaction
     }    
 }
 
+function toAlmostEqualTons(subject: bigint, cmp: bigint) {
+    let diff = subject - cmp;
+    if (diff < 0) diff = -diff;
+    // @ts-ignore    
+    if (this.isNot) {
+        expect(diff).not.toBeLessThanOrEqual(10n);
+    }
+    else {
+        expect(diff).toBeLessThanOrEqual(10n);
+    }
+    // @ts-ignore
+    return { pass: !this.isNot };
+}
+
 try {
     const jestGlobals = require("@jest/globals");
 
     if (jestGlobals) jestGlobals.expect.extend({
         toHaveTransactionSeq,
+        toAlmostEqualTons,
     })
 } catch (e) {}
 
@@ -229,6 +245,7 @@ declare global {
     export namespace jest {
         interface Matchers<R> {
             toHaveTransactionSeq(cmp: TransactionDesc[]): R
+            toAlmostEqualTons(cmp: bigint): R
         }
     }
 }
