@@ -302,7 +302,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'https://muratov.xyz/nftorrent/c/EQBzISuKCM897sD92KU2PeuzYraCmA-k3J2PmonajqRuQ9pQ'
+            image: 'https://muratov.xyz/nftorrent/c/EQDSEW-ffF7LWJ_ldnwGlJ1bDgCPSjnyOaX68JoTrUNuSjtc'
         });
     });
 
@@ -375,7 +375,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'https://muratov.xyz/petsmem/images/EQBzISuKCM897sD92KU2PeuzYraCmA-k3J2PmonajqRuQ9pQ'
+            image: 'https://muratov.xyz/petsmem/images/EQDSEW-ffF7LWJ_ldnwGlJ1bDgCPSjnyOaX68JoTrUNuSjtc'
         });        
     });    
 
@@ -1181,7 +1181,7 @@ describe('PetMemoryNft Methods', () => {
             const nftContent1 =  await petsCollection.getGetNftContent(nftData1.index, nftData1.individualContent);
             const attributes1 = await decodeNftMetadata(nftContent1);
             expect(attributes1.description).toBe('Overriden Description');
-            expect(attributes1.image).toBe('https://muratov.xyz/nftorrent/c/EQDs20APIYzlEyCogFQRtBOX9tilxYBx3G50SDkHIlvr-Nuw');
+            expect(attributes1.image).toBe('https://muratov.xyz/nftorrent/c/EQCv4SFGeWrG4_Ufg6n6yEVA3kub02fqO3enCLxB083wkSv0');
             expect(attributes1.uri).toBeUndefined();
 
 
@@ -1227,7 +1227,7 @@ describe('PetMemoryNft Methods', () => {
                     data: {
                         $$type: 'NftMutableMetaData',
                         description: nftData.description,
-                        image: "wxr72yjs3lvvc5r3fjygr4rb",
+                        image: ":wxr72yjs3lvvc5r3fjygr4rb",
                         imageData: null,
                         uri: nftData.uri,
                         bagId: BigInt('0xBA53CDEB0361AE63213FD0C3E9909EF7E8BFEAEBEBB53B90731714ABCB39FB07')
@@ -1237,7 +1237,7 @@ describe('PetMemoryNft Methods', () => {
             const nftData3 = await nftItem.getGetNftData();
             const nftContent3 =  await petsCollection.getGetNftContent(nftData3.index, nftData3.individualContent);
             const attributes3 = await decodeNftMetadata(nftContent3);
-            expect(attributes3.image).toBe('https://muratov.xyz/nftorrent/c/EQDs20APIYzlEyCogFQRtBOX9tilxYBx3G50SDkHIlvr-Nuw');
+            expect(attributes3.image).toBe('https://muratov.xyz/nftorrent/c/EQCv4SFGeWrG4_Ufg6n6yEVA3kub02fqO3enCLxB083wkSv0');
         }
     });    
 
