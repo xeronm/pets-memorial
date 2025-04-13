@@ -76,7 +76,7 @@ const nftImmData: PetMemoryNftImmutableData = {
     countryCode: 0x234n, // "ru"
     location: 'Krasnodar 350020',
     geoPoint: null,
-    birthDate: 0n,
+    birthDate: 0x20120000n,
     deathDate: 0x20241115n,
 }
 
@@ -302,7 +302,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'https://muratov.xyz/nftorrent/c/EQDSEW-ffF7LWJ_ldnwGlJ1bDgCPSjnyOaX68JoTrUNuSjtc'
+            image: 'https://muratov.xyz/nftorrent/c/EQCxoapNkFQPMZIhzcBoeKNuIU6KvQZMMPHKlp8U_z9SWZ-G'
         });
     });
 
@@ -375,7 +375,7 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'Test Collection Description',
-            image: 'https://muratov.xyz/petsmem/images/EQDSEW-ffF7LWJ_ldnwGlJ1bDgCPSjnyOaX68JoTrUNuSjtc'
+            image: 'https://muratov.xyz/petsmem/images/EQCxoapNkFQPMZIhzcBoeKNuIU6KvQZMMPHKlp8U_z9SWZ-G'
         });        
     });    
 
@@ -1139,7 +1139,7 @@ describe('PetMemoryNft Methods', () => {
             expect(attributes.description).toBe(nftData.description);
             expect(attributes.uri).toBe(nftData.uri);
             expect(attributes.image).toBe(nftData.image);
-            expect(attributes.name).toBe('Marcus, Cat, RU, Krasnodar 350020 (* ~ 2024-11-15)');
+            expect(attributes.name).toBe('Marcus, Cat, RU, Krasnodar 350020 (2012-* ~ 2024-11-15)');
             expect(attributes.image_data.length).toBeGreaterThan(3000);
             expect(attributes.image_data).toStrictEqual(imageData);
         }
@@ -1181,7 +1181,7 @@ describe('PetMemoryNft Methods', () => {
             const nftContent1 =  await petsCollection.getGetNftContent(nftData1.index, nftData1.individualContent);
             const attributes1 = await decodeNftMetadata(nftContent1);
             expect(attributes1.description).toBe('Overriden Description');
-            expect(attributes1.image).toBe('https://muratov.xyz/nftorrent/c/EQCv4SFGeWrG4_Ufg6n6yEVA3kub02fqO3enCLxB083wkSv0');
+            expect(attributes1.image).toBe('https://muratov.xyz/nftorrent/c/EQB2I1cKQC8J-VZDb7EBfQRUQuxpCPSqQz77iwcFp926DfES');
             expect(attributes1.uri).toBeUndefined();
 
 
@@ -1237,7 +1237,7 @@ describe('PetMemoryNft Methods', () => {
             const nftData3 = await nftItem.getGetNftData();
             const nftContent3 =  await petsCollection.getGetNftContent(nftData3.index, nftData3.individualContent);
             const attributes3 = await decodeNftMetadata(nftContent3);
-            expect(attributes3.image).toBe('https://muratov.xyz/nftorrent/c/EQCv4SFGeWrG4_Ufg6n6yEVA3kub02fqO3enCLxB083wkSv0');
+            expect(attributes3.image).toBe('https://muratov.xyz/nftorrent/c/EQB2I1cKQC8J-VZDb7EBfQRUQuxpCPSqQz77iwcFp926DfES');
         }
     });    
 
