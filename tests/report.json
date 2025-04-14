@@ -5,7 +5,7 @@
             "extTotalFees": "0.032584546",
             "outValue": "0.25",
             "inValue": "0.1970176",
-            "totalFees": "0.035423877",
+            "totalFees": "0.035423878",
             "collectionBalance": "0.05"
         },
         "CollectionDeposit": {
@@ -86,10 +86,10 @@
         },
         "MintPetMemoryNft_Big128": {
             "amount": "0.1748436",
-            "extTotalFees": "0.022992582",
+            "extTotalFees": "0.022992583",
             "outValue": "0.25",
             "inValue": "0.0751564",
-            "totalFees": "0.055399921"
+            "totalFees": "0.055399924"
         },
         "MintPetMemoryNft_Big256": {
             "amount": "0.1851364",
@@ -147,7 +147,7 @@
     "storageAnnualFees": {
         "Collection": "0.047725533",
         "MintPetMemoryNft_small": "0.017562881",
-        "MintPetMemoryNft_medium": "0.022686711",
+        "MintPetMemoryNft_medium": "0.022686712",
         "MintPetMemoryNft_big128": "0.043488075",
         "MintPetMemoryNft_big256": "0.05"
     },
@@ -201,9 +201,9 @@
                 "value": "0.1970176",
                 "outActions": 0,
                 "outValue": "0",
-                "totalFees": "0.0001236",
+                "totalFees": "0.000123601",
                 "computeFee": "0.0001236",
-                "storageFees": "0",
+                "storageFees": "0.000000001",
                 "exitCode": 0,
                 "outMessages": [],
                 "body": 0
@@ -1461,10 +1461,10 @@
                 "value": "0",
                 "outActions": 1,
                 "outValue": "0.25",
-                "totalFees": "0.022992582",
+                "totalFees": "0.022992583",
                 "totalFwdFees": "0.0164588",
                 "computeFee": "0.0007748",
-                "storageFees": "0",
+                "storageFees": "0.000000001",
                 "exitCode": 0,
                 "outMessages": [
                     {
@@ -1483,10 +1483,10 @@
                 "value": "0.25",
                 "outActions": 1,
                 "outValue": "0.1355368",
-                "totalFees": "0.022222275",
+                "totalFees": "0.022222277",
                 "totalFwdFees": "0.0244632",
                 "computeFee": "0.014068",
-                "storageFees": "0",
+                "storageFees": "0.000000002",
                 "exitCode": 0,
                 "outMessages": [
                     {

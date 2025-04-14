@@ -4,8 +4,10 @@ import {
   encodeGeoPoint,
   decodeDateMask,
   decodeBcd2c,
-  decodeGeoPoint
+  decodeGeoPoint,
+  decodeQint
 } from '../encoders';
+import { toNano } from '@ton/core';
 
 describe('Encoders', () => {
 
@@ -45,6 +47,13 @@ describe('Encoders', () => {
       latitude: 45.04627346992493,
       longitude: 38.98168087005615,
     });
+  });  
+
+  it('QInt', async () => {
+    expect(decodeQint(0x31)).toBe(toNano("0.00125"));
+    expect(decodeQint(0x34)).toBe(toNano("0.00500"));
+    expect(decodeQint(0x38)).toBe(toNano("0.01000"));
+    expect(decodeQint(0x3A)).toBe(toNano("0.02500"));
   });  
 
 });

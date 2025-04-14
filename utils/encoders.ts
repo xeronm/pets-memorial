@@ -92,3 +92,34 @@ export function decodeGeoPoint(n: number): GeoPoint {
     longitude: Number((bn & 0xFFFFFFn) * 360n) / Number(1n << 24n)
   };
 }
+
+// Decodings:
+//   3 bits - base_factor, where base = 10/8
+//   4 bits - power of 10
+//
+// Examples:
+//     0x30 -> 00110 000 -> 0.00100 TON
+//     0x31 -> 00110 001 -> 0.00125 TON
+//     0x32 -> 00110 010 -> 0.00250 TON
+//     0x33 -> 00110 011 -> 0.00375 TON
+//     0x34 -> 00110 100 -> 0.00500 TON
+//     0x35 -> 00110 101 -> 0.00625 TON
+//     0x36 -> 00110 110 -> 0.00750 TON
+//     0x37 -> 00110 111 -> 0.00875 TON
+//     0x38 -> 00111 000 -> 0.01000 TON
+//     0x39 -> 00111 001 -> 0.01250 TON
+//     0x3A -> 00111 010 -> 0.02500 TON
+//     0x3B -> 00111 011 -> 0.03750 TON
+//     0x3C -> 00111 100 -> 0.05000 TON
+//     0x3D -> 00111 101 -> 0.06250 TON
+//     0x3E -> 00111 110 -> 0.07500 TON
+//     0x3F -> 00111 111 -> 0.08750 TON
+//     0x40 -> 01000 000 -> 0.10000 TON
+//     0x48 -> 01001 000 -> 1.00000 TON
+export function decodeQint(qnum: number): bigint {
+  let num = qnum & 0x7F;
+  if (num == 0) return 0n;
+  num = (num & 7) * 10;
+  if (num == 0) num = 8;
+  return (BigInt(num) * BigInt(Math.pow(10, qnum >> 3))) >> 3n;
+}
