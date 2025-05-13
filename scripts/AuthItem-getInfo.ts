@@ -17,6 +17,6 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   const authItem = provider.open(AuthItem.fromAddress(address));
 
-  console.log('Info:', await authItem.getInfo());
+  console.log('Info:', await authItem.getGetInfo());
   console.log('NFT Data:', await authItem.getGetNftData());
 }

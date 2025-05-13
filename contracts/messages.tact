@@ -1,4 +1,4 @@
-const MintPetMemoryNftGasFeeMin: Int = ton("0.015");
+const MintPetMemoryNftGasFeeMin: Int = ton("0.016");
 const MintPetMemoryNftFwdFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasAndFwdFeeMin: Int = MintPetMemoryNftFwdFeeMin + PetMemoryNftTransferGasFeeMin;
@@ -6,10 +6,14 @@ const PetMemoryNftTransferGasAndFwdFeeMin: Int = MintPetMemoryNftFwdFeeMin + Pet
 const DonateGasFeeMin: Int = ton("0.007");
 const DonateReplyGasFeeMin: Int = ton("0.008");
 
-const SecondsInYear: Int = 31536000; // 365 * 24 * 60 * 60 
+const SecondsInYear: Int = 31536000; // 365 * 24 * 60 * 60
 
 const MinFeeStorage: Int = 0x38; // 0.01 TON
 const MinFeeClassA: Int = 0x30; // 0.001 TON
+
+const FallbackModeNone: Int = 0x0;
+const FallbackModeBasic: Int = 0x1;
+const FallbackModeExt: Int = 0x2;
 
 const VoteStatusError: Int = 0;
 const VoteStatusPending: Int = 1;
@@ -27,7 +31,7 @@ fun speciesToName(species: Int): String {
     }
     else if (species == 2) {
         return "Cat"
-    } 
+    }
     return "";
 }
 
@@ -37,13 +41,13 @@ struct PetMemoryNftImmutableData {
     species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3... - reserved;
     name: String;
     sex: Int as uint1; // 0 - male, 1 - female
-    speciesName: String?;    
+    speciesName: String?;
     breed: String?;
     lang: Int? as uint10; // ISO 639 two letter language code encoded as 5bits for every letter,
                          // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
     countryCode: Int as uint10; // ISO 3166-1 alpha-2 code, e.g. "ru"; encoded as 5bits for every letter,
                                 // examles: 00100 01101 (0x8D) - "en", 10001 10100 (0x234) - "ru"
-    geoPoint: Int? as uint48; // Geographical Point information with accuracy of 3m, coded in accordance of 3GPP TS 23.033 6.1. Point. 
+    geoPoint: Int? as uint48; // Geographical Point information with accuracy of 3m, coded in accordance of 3GPP TS 23.033 6.1. Point.
                             // First 24-bits for Latitude: 1 bit for hemisphere, 23 bits - N and X - degrees of latitude, where N < (2^23 * X / 90) < N+1
                             // Last 24-bits for Longitude, 24 bits - N and X - degrees of longitude, where N < (2^24 * X / 360) < N+1
     location: String?; // It's preferred to use Postal Code
@@ -52,7 +56,6 @@ struct PetMemoryNftImmutableData {
 }
 
 struct NftMutableMetaData {
-    bagId: Int? as uint256;
     uri: String?;
     description: String?;
     image: String?;
@@ -70,7 +73,9 @@ message(0x4219f222) UpdateSettings {
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
-    prefixUri: String?;
+    fbMode: Int as uint2;
+    fbUri: String?;
+    data: NftMutableMetaData?;
 }
 
 message(0xa77a7982) Withdraw {
@@ -83,13 +88,13 @@ message(0xa77a7982) Withdraw {
 
 message(0x19e2ce21) WithdrawForward {
     forwardPayload: Slice as remaining;
-} 
+}
 
 message(0xeaf4673d) WithdrawResult {
-    isClassB: Bool;    
+    isClassB: Bool;
     balanceWithdrawn: Int as coins;
     customPayload: Cell?;
-} 
+}
 
 message(0x399987e2) MintPetMemoryNft {
     feeClassA: Int as uint8;
@@ -124,7 +129,7 @@ struct PetMemoryNftInit {
 
 message DonateCollection {
     feeClassA: Int as uint8;
-    feeClassB: Int as uint8;    
+    feeClassB: Int as uint8;
 }
 
 message Destroy {}

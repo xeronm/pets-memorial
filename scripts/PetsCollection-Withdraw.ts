@@ -15,11 +15,11 @@ export async function run(provider: NetworkProvider, args: string[]) {
   }
 
   const petsCollection = provider.open(PetsCollection.fromAddress(address));
-  const info1 = await petsCollection.getInfo();
+  const info1 = await petsCollection.getGetInfo();
   console.log('Info before: ', info1);
 
   await petsCollection.send(
-    provider.sender(), 
+    provider.sender(),
     {
       value: toNano('0.01')
     },
@@ -33,12 +33,12 @@ export async function run(provider: NetworkProvider, args: string[]) {
     }
   );
 
-  let info2 = await petsCollection.getInfo();
+  let info2 = await petsCollection.getGetInfo();
   let attempt = 1;
   while (info2.balanceClassA == info1.balanceClassA && info2.balanceClassB == info1.balanceClassB) {
     ui.setActionPrompt(`Attempt ${attempt}`);
     await sleep(3000);
-    info2 = await petsCollection.getInfo();
+    info2 = await petsCollection.getGetInfo();
     attempt++;
   }
   ui.clearActionPrompt();
