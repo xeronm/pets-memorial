@@ -22,9 +22,9 @@ import { PetMemoryNft } from '../build/PetsCollection/tact_PetMemoryNft';
 
 const ExitCodes = {
     ErrorNotEnoughtToncoin: 37,
-    ErrorValidation: 14516,
-    ErrorNotAuthorized: 54277,
-    ErrorInsufficientFunds: 15166,
+    ErrorNotAuthorized: 401,
+    ErrorValidation: 402,
+    ErrorInsufficientFunds: 403,
 };
 
 
@@ -75,6 +75,15 @@ const nftImmData: PetMemoryNftImmutableData = {
     geoPoint: null,
     birthDate: 0x20120000n,
     deathDate: 0x20241115n,
+}
+
+const FallBackUri = 'https://s.petsmem.site/c/';
+const CollectionMeta: NftMutableMetaData = {
+    $$type: 'NftMutableMetaData',
+    description: 'Test Collection Description',
+    image: null,
+    imageData: null,
+    uri: null,
 }
 
 async function decodeNftMetadata(cell: Cell): Promise<{[key: string]: string | Buffer}> {
@@ -134,7 +143,7 @@ describe('PetsCollection Deploy', () => {
 
         deployer = await blockchain.treasury('deployer');
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address, FallBackUri, CollectionMeta));
 
         addrNames = {
             'Deployer': deployer.address,
@@ -246,7 +255,7 @@ describe('PetsCollection Methods', () => {
 
         deployer = await blockchain.treasury('deployer');
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address, FallBackUri, CollectionMeta));
 
         deployResult = await petsCollection.send(
             deployer.getSender(),
@@ -288,12 +297,12 @@ describe('PetsCollection Methods', () => {
             balance: StorageTonsReserve.Collection,
             balanceClassA: toNano("0.05"),
             balanceClassB: 0n,
-            fbMode: 0n,
+            fbMode: 1n,
             fbUri: "https://s.petsmem.site/c/",
             data: {
                 $$type: 'NftMutableMetaData',
                 uri: null,
-                description: null,
+                description: "Test Collection Description",
                 image: null,
                 imageData: null,
             }
@@ -306,6 +315,7 @@ describe('PetsCollection Methods', () => {
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
+            description: 'Test Collection Description',
             image: `https://s.petsmem.site/c/${petsCollection.address}?q=image`
         });
     });
@@ -338,6 +348,8 @@ describe('PetsCollection Methods', () => {
     })
 
     it('UpdateSettings: should update settings', async () => {
+        const contract = await blockchain.getContract(petsCollection.address);
+        const balanceBefore = contract.balance;
         const updateSettings = await petsCollection.send(
             deployer.getSender(),
             {
@@ -348,7 +360,7 @@ describe('PetsCollection Methods', () => {
                 feeStorage: 0x3An,
                 feeClassA: 0x30n,
                 feeClassB: 0n,
-                fbMode: 1n,
+                fbMode: 0n,
                 fbUri: 'https://s.petsmem.ru/c/',
                 data: {
                     $$type: 'NftMutableMetaData',
@@ -361,7 +373,6 @@ describe('PetsCollection Methods', () => {
         )
 
         resultReport.details.CollectionUpdateSettings = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
-
         expect(updateSettings.transactions).toHaveTransactionSeq([
             {},
             {from: deployer.address, to: petsCollection.address},
@@ -369,6 +380,9 @@ describe('PetsCollection Methods', () => {
         ]);
 
         resultReport.flows.CollectionUpdateSettings = transactionAmountFlow(updateSettings.transactions);
+
+        const contract2 = await blockchain.getContract(petsCollection.address);
+        expect(contract2.balance).toBe(balanceBefore);
 
         const info = await petsCollection.getGetInfo();
 
@@ -380,7 +394,7 @@ describe('PetsCollection Methods', () => {
             balance: StorageTonsReserve.Collection,
             balanceClassA: toNano("0.05"),
             balanceClassB: 0n,
-            fbMode: 1n,
+            fbMode: 0n,
             fbUri: "https://s.petsmem.ru/c/",
             data: {
                 $$type: 'NftMutableMetaData',
@@ -396,8 +410,40 @@ describe('PetsCollection Methods', () => {
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
             description: 'New Collection Description',
-            image: `http://abcd.com/myimage.jpeg`,
-            uri: `https://s.petsmem.ru/c/${petsCollection.address}?q=uri`,
+            image: "http://abcd.com/myimage.jpeg",
+            uri: "ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/meta.json",
+        });
+
+
+        const updateSettings2 = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'UpdateSettings',
+                feeStorage: 0x3An,
+                feeClassA: 0x30n,
+                feeClassB: 0n,
+                fbMode: 2n,
+                fbUri: 'https://s.petsmem.ru/c/',
+                data: {
+                    $$type: 'NftMutableMetaData',
+                    description: 'New Collection Description',
+                    uri: "https://abcd.com/mymeta.json",
+                    image: "ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/image.jpeg",
+                    imageData: null,
+                }
+            }
+        )
+
+        const data2 =  await petsCollection.getGetCollectionData();
+        const attributes2 = await decodeNftMetadata(data2.collectionContent);
+        expect(attributes2).toStrictEqual({
+            name: 'Test Collection',
+            description: 'New Collection Description',
+            image: `https://s.petsmem.ru/c/${petsCollection.address}?q=image&u=ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/image.jpeg`,
+            uri: "https://abcd.com/mymeta.json",
         });
     });
 
@@ -419,13 +465,64 @@ describe('PetsCollection Methods', () => {
         )
         resultReport.details.CollectionUpdateSettings_Unauthorized = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
 
-        expect(updateSettings.transactions).toHaveTransaction({
-            from: anyUser.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorNotAuthorized,
-        });
+        expect(updateSettings.transactions).toHaveTransactionSeq([
+            {},
+            {from: anyUser.address, to: petsCollection.address, success: false, exitCode: ExitCodes.ErrorNotAuthorized},
+        ]);
+    });
+
+    it('UpdateSettings: should not update settings (ErrorValidation)', async () => {
+        const updateSettings = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MinTransactionAmount,
+            },
+            {
+                $$type: 'UpdateSettings',
+                feeStorage: 0x3An,
+                feeClassA: 0n,
+                feeClassB: 0n,
+                fbMode: 0n,
+                fbUri: null,
+                data: null,
+            }
+        )
+        resultReport.details.CollectionUpdateSettings_ErrorValidation = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
+
+        expect(updateSettings.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address, success: false, exitCode: ExitCodes.ErrorValidation},
+        ]);
+    });
+
+    it('UpdateSettings: should not update settings (InsufficientFunds)', async () => {
+        const contract = await blockchain.getContract(petsCollection.address);
+        const balanceBefore = contract.balance;
+        const updateSettings = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: toNano('0.0025'),
+            },
+            {
+                $$type: 'UpdateSettings',
+                feeStorage: 0x3An,
+                feeClassA: 0x3An,
+                feeClassB: 0n,
+                fbMode: 0n,
+                fbUri: null,
+                data: null,
+            }
+        )
+        resultReport.details.CollectionUpdateSettings_InsufficientFunds = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
+
+        const contract2 = await blockchain.getContract(petsCollection.address);
+        expect(contract2.balance).toBe(balanceBefore);
+
+        expect(updateSettings.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address, success: false, exitCode: -14},
+        ]);
+
     });
 
     it('Withdraw: should withdraw (classA)', async () => {
@@ -689,7 +786,7 @@ describe('PetsCollection Methods', () => {
         expect(data.ownerAddress).toEqualAddress(anyUser.address);
     });
 
-    it('ChageOwner: should not withdraw (Unathorized)', async () => {
+    it('ChageOwner: should not change (Unathorized)', async () => {
         const changeOwner = await petsCollection.send(
             anyUser.getSender(),
             {
@@ -703,15 +800,11 @@ describe('PetsCollection Methods', () => {
 
         resultReport.details.CollectionChangeOwner_Unathorized = transactionReport(changeOwner.transactions, PetsCollection.opcodes, addrNames);
 
-        expect(changeOwner.transactions).toHaveTransaction({
-            from: anyUser.address,
-            to: petsCollection.address,
-            success: false,
-            aborted: true,
-            exitCode: ExitCodes.ErrorNotAuthorized,
-        });
+        expect(changeOwner.transactions).toHaveTransactionSeq([
+            {},
+            {from: anyUser.address, to: petsCollection.address, success: false, exitCode: ExitCodes.ErrorNotAuthorized},
+        ]);
     });
-
 
     it('MintPetMemoryNft: shloud mint NFT for sender', async () => {
         const expectedDueTime = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
@@ -981,7 +1074,7 @@ describe('PetMemoryNft Methods', () => {
         blockchain = await Blockchain.create();
         deployer = await blockchain.treasury('deployer');
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address, FallBackUri, CollectionMeta));
 
         deployResult = await petsCollection.send(
             deployer.getSender(),
@@ -1260,7 +1353,7 @@ describe('PetMemoryNft Methods', () => {
             const nftData3 = await nftItem.getGetNftData();
             const nftContent3 =  await petsCollection.getGetNftContent(nftData3.index, nftData3.individualContent);
             const attributes3 = await decodeNftMetadata(nftContent3);
-            expect(attributes3.image).toBe("tonstorage://BA53CDEB0361AE63213FD0C3E9909EF7E8BFEAEBEBB53B90731714ABCB39FB07#wxr72yjs3lvvc5r3fjygr4rb");
+            expect(attributes3.image).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=image`);
         }
     });
 

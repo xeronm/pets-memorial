@@ -27,8 +27,6 @@ const FieldImage: Int = sha256("image");
 const FieldImageData: Int = sha256("image_data");
 
 const PetsCollectionName: String = "Test Collection";
-const PetsCollectionDescription: String = "Test Collection Description";
-const DefaultPrefixUri: String = "https://s.petsmem.site/c/";
 
 const ContentTypeImage: String = "image";
 const ContentTypeUri: String = "uri";
@@ -85,13 +83,14 @@ contract PetsCollection {
     feeClassA: Int as uint8 = 0x3A; // 0.025 TON
     feeClassB: Int as uint8 = 0x3C; // 0.05 TON
     //
-    fbMode: Int as uint2 = FallbackModeNone;
-    fbUri: String = DefaultPrefixUri;
-    data: NftMutableMetaData = NftMutableMetaData{};
+    fbMode: Int as uint2 = FallbackModeBasic;
+    fbUri: String;
+    data: NftMutableMetaData;
 
-    init(owner: Address) {
+    init(owner: Address, fbUri: String, data: NftMutableMetaData) {
         self.owner = owner;
-        // self.prefixUri = DefaultPrefixUri;
+        self.data = data;
+        self.fbUri = fbUri;
     }
 
     receive() {
@@ -102,7 +101,7 @@ contract PetsCollection {
     }
 
     receive(msg: MintPetMemoryNft) {
-        require(self.nftIndexSeq > 0, "ErrorValidation");
+        throwUnless(ErrorValidation, self.nftIndexSeq > 0);
 
         let storageReserve: Int = unpackQint(self.feeStorage);
         let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
@@ -112,7 +111,7 @@ contract PetsCollection {
 
         let remainingValue = ctx.value - (feeClassA + feeClassB + MintPetMemoryNftGasFeeMin);
         // All fees (storage, compute, forward) are deducted from main, Class A balance.
-        require(remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasAndFwdFeeMin, "ErrorInsufficientFunds");
+        throwUnless(ErrorInsufficientFunds, remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasAndFwdFeeMin);
 
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), self.nftIndexSeq);
         self.nftIndexSeq += 1;
@@ -141,14 +140,14 @@ contract PetsCollection {
 
     receive(msg: Donate) {
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), msg.index);
-        require(sender() == contractAddress(nftInit), "ErrorNotAuthorized");
+        throwUnless(ErrorNotAuthorized, sender() == contractAddress(nftInit));
 
         let feeClassA: Int = unpackQint(max(msg.feeClassA, MinFeeClassA));
         let feeClassB: Int = unpackQint(msg.feeClassB);
 
         let ctx = context();
         let remainingValue = ctx.value - (feeClassA + feeClassB + DonateGasFeeMin);
-        require(remainingValue >= DonateReplyGasFeeMin, "ErrorInsufficientFunds");
+        throwUnless(ErrorInsufficientFunds, remainingValue >= DonateReplyGasFeeMin);
 
         self.balanceClassB += feeClassB;
 
@@ -164,10 +163,10 @@ contract PetsCollection {
     }
 
     receive(msg: Withdraw) {
-        require(sender() == self.owner, "ErrorNotAuthorized");
+        throwUnless(ErrorNotAuthorized, sender() == self.owner);
 
         let available: Int = self.availableBalance(msg.isClassB, myBalance() - context().value);
-        require(available >= msg.amount, "ErrorInsufficientFunds");
+        throwUnless(ErrorInsufficientFunds, available >= msg.amount);
         if (msg.isClassB) {
             self.balanceClassBWithdrawn += msg.amount;
         }
@@ -202,9 +201,8 @@ contract PetsCollection {
     }
 
     receive(msg: UpdateSettings) {
-        require(sender() == self.owner, "ErrorNotAuthorized");
-
-        require(msg.feeStorage >= MinFeeStorage && msg.feeClassA >= MinFeeClassA, "ErrorValidation");
+        throwUnless(ErrorNotAuthorized, sender() == self.owner);
+        throwUnless(ErrorValidation, msg.feeStorage >= MinFeeStorage && msg.feeClassA >= MinFeeClassA);
         self.feeStorage = msg.feeStorage;
         self.feeClassA = msg.feeClassA;
         self.feeClassB = msg.feeClassB;
@@ -215,12 +213,11 @@ contract PetsCollection {
         if (msg.data != null) {
             self.data = msg.data!!;
         }
-
         cashback(sender());
     }
 
     receive(msg: ChangeOwner) {
-        require(sender() == self.owner, "ErrorNotAuthorized");
+        throwUnless(ErrorNotAuthorized, sender() == self.owner);
         self.owner = msg.newOwner;
         cashback(sender());
     }
@@ -292,9 +289,6 @@ contract PetsCollection {
             uri = makeUri(self.fbUri, self.fbMode, address, ContentTypeUri, content.data.uri);
         }
         description = content.data.description;
-        if (description == null) {
-            description = PetsCollectionName;
-        }
         imageData = content.data.imageData;
         if (content.data.image != null || imageData == null) {
             image = makeUri(self.fbUri, self.fbMode, address, ContentTypeImage, content.data.image);

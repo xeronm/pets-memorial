@@ -17,17 +17,17 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   const authItem = provider.open(AuthItem.fromAddress(address));
 
-  const info = await authItem.getInfo();
+  const info = await authItem.getGetInfo();
   console.log('Info:', info);
 
   await authItem.send(
-    provider.sender(), 
+    provider.sender(),
     {
       value: toNano('0.03'),
     },
     {
         $$type: 'AuthItemWithdraw',
         'queryId': 0n,
-    }  
+    }
   );
 }

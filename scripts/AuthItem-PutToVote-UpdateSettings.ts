@@ -1,7 +1,7 @@
 import { Address, toNano, beginCell } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 import { AuthItem } from '../wrappers/AuthItem';
-import { 
+import {
   storeUpdateSettings,
   PetsCollection,
 } from '../wrappers/PetsCollection';
@@ -23,7 +23,7 @@ storeUpdateSettings({
   })(UpdateSettings);
 UpdateSettings.endCell();
 
-        
+
 
 export async function run(provider: NetworkProvider, args: string[]) {
   const ui = provider.ui();
@@ -35,13 +35,13 @@ export async function run(provider: NetworkProvider, args: string[]) {
       return;
   }
 
-  const authItem = provider.open(AuthItem.fromAddress(address));  
+  const authItem = provider.open(AuthItem.fromAddress(address));
 
-  const infoBefore = await authItem.getInfo();
+  const infoBefore = await authItem.getGetInfo();
 
   const petsCollection = provider.open(PetsCollection.fromAddress(infoBefore.collectionAddress));
 
-  const collInfo = await petsCollection.getInfo();
+  const collInfo = await petsCollection.getGetInfo();
 
   if (collInfo.voteAction != null) {
     ui.write(`Error: Vote already in progress: ${collInfo.voteAction}`);
@@ -49,7 +49,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
   }
 
   await authItem.send(
-    provider.sender(), 
+    provider.sender(),
     {
       value: toNano('0.2'),
     },
@@ -57,25 +57,25 @@ export async function run(provider: NetworkProvider, args: string[]) {
         $$type: 'AuthItemPutToVote',
         queryId: 0n,
         message: UpdateSettings.asCell()
-    }  
+    }
   );
 
-  let infoAfter = await authItem.getInfo();
+  let infoAfter = await authItem.getGetInfo();
   let attempt = 1;
   while (infoAfter.voteStateId === infoBefore.voteStateId) {
     ui.setActionPrompt(`Attempt ${attempt}`);
     await sleep(3000);
-    infoAfter = await authItem.getInfo();
+    infoAfter = await authItem.getGetInfo();
     attempt++;
   }
 
-  const collInfoAfter = await petsCollection.getInfo();
+  const collInfoAfter = await petsCollection.getGetInfo();
 
   ui.clearActionPrompt();
   if (collInfoAfter.voteAction != null) {
     ui.write('Settings Update Put to Vote successfully! Wainting for Vote to be complete!');
   }
   else {
-    ui.write('Settings Updated successfully!');       
+    ui.write('Settings Updated successfully!');
   }
 }
