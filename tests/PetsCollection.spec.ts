@@ -158,6 +158,11 @@ describe('PetsCollection Deploy', () => {
         // console.log('Deploy transaction details:');
         // printTransactionFees(deployResult.transactions);
         // dumpTransactions(deployResult.transactions);
+        expect(deployResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address, deploy: true},
+            {from: petsCollection.address},
+        ]);
 
         const contract = await blockchain.getContract(petsCollection.address);
         expect(contract.balance).toBe(StorageTonsReserve.Collection);
@@ -166,12 +171,6 @@ describe('PetsCollection Deploy', () => {
             ...transactionAmountFlow(deployResult.transactions),
             collectionBalance: contract.balance
         };
-
-        expect(deployResult.transactions).toHaveTransactionSeq([
-            {},
-            {to: petsCollection.address, deploy: true},
-            {from: petsCollection.address},
-        ]);
     });
 
     it('Deploy: should not deploy (InsufficientFunds)', async () => {
