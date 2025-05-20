@@ -14,7 +14,6 @@ struct Info {
     //
     fbMode: Int as uint2;
     fbUri: String;
-    data: NftMutableMetaData;
 }
 
 const MaxAuthItemIndex: Int = 15;
@@ -30,6 +29,7 @@ const PetsCollectionName: String = "Test Collection";
 
 const ContentTypeImage: String = "image";
 const ContentTypeUri: String = "uri";
+const DefaultFallback: String = "https://s.petsmem.site/c/";
 
 fun encodeNftMetadataContent(name: String, uri: String?, description: String?, image: String?, imageData: Cell?): Cell {
     let dict: map<Int as uint256, Cell> = emptyMap();
@@ -72,7 +72,7 @@ contract PetsCollection {
     owner: Address;
     // Mutable Internal Attributes
     // - Minting data
-    nftIndexSeq: Int as uint40 = 1;
+    nftIndexSeq: Int as uint40 = 0;
     // - Balances
     balanceClassAWithdrawn: Int as coins = 0;
     balanceClassBWithdrawn: Int as coins = 0;
@@ -84,13 +84,10 @@ contract PetsCollection {
     feeClassB: Int as uint8 = 0x3C; // 0.05 TON
     //
     fbMode: Int as uint2 = FallbackModeBasic;
-    fbUri: String;
-    data: NftMutableMetaData;
+    fbUri: String = DefaultFallback;
 
-    init(owner: Address, fbUri: String, data: NftMutableMetaData) {
+    init(owner: Address) {
         self.owner = owner;
-        self.data = data;
-        self.fbUri = fbUri;
     }
 
     receive() {
@@ -101,8 +98,6 @@ contract PetsCollection {
     }
 
     receive(msg: MintPetMemoryNft) {
-        throwUnless(ErrorValidation, self.nftIndexSeq > 0);
-
         let storageReserve: Int = unpackQint(self.feeStorage);
         let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
         let feeClassB: Int = unpackQint(max(msg.feeClassB, self.feeClassB));
@@ -210,9 +205,6 @@ contract PetsCollection {
         if (msg.fbUri != null) {
             self.fbUri = msg.fbUri!!;
         }
-        if (msg.data != null) {
-            self.data = msg.data!!;
-        }
         cashback(sender());
     }
 
@@ -224,20 +216,12 @@ contract PetsCollection {
 
     get fun get_collection_data(): CollectionData {
         let address: String = myAddress().toString();
-        let uri: String? = null;
-        if (self.data.uri != null) {
-            uri = makeUri(self.fbUri, self.fbMode, address, ContentTypeUri, self.data.uri);
-        }
-        let image: String? = null;
-        if (self.data.image != null || self.data.imageData == null) {
-            image = makeUri(self.fbUri, self.fbMode, address, ContentTypeImage, self.data.image);
-        }
         let content: Cell = encodeNftMetadataContent(
             PetsCollectionName,
-            uri,
-            self.data.description,
-            image,
-            self.data.imageData,
+            makeUri(self.fbUri, 0, address, ContentTypeUri, null),
+            null,
+            makeUri(self.fbUri, 0, address, ContentTypeImage, null),
+            null
         );
 
         return CollectionData{
@@ -318,7 +302,6 @@ contract PetsCollection {
             //
             fbMode: self.fbMode,
             fbUri: self.fbUri,
-            data: self.data,
         }
     }
 
