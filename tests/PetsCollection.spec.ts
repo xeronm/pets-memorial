@@ -143,7 +143,7 @@ describe('PetsCollection Deploy', () => {
 
         deployer = await blockchain.treasury('deployer');
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address, FallBackUri, CollectionMeta));
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
 
         addrNames = {
             'Deployer': deployer.address,
@@ -255,7 +255,7 @@ describe('PetsCollection Methods', () => {
 
         deployer = await blockchain.treasury('deployer');
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address, FallBackUri, CollectionMeta));
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
 
         deployResult = await petsCollection.send(
             deployer.getSender(),
@@ -299,13 +299,6 @@ describe('PetsCollection Methods', () => {
             balanceClassB: 0n,
             fbMode: 1n,
             fbUri: "https://s.petsmem.site/c/",
-            data: {
-                $$type: 'NftMutableMetaData',
-                uri: null,
-                description: "Test Collection Description",
-                image: null,
-                imageData: null,
-            }
         });
     });
 
@@ -315,7 +308,7 @@ describe('PetsCollection Methods', () => {
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
             name: 'Test Collection',
-            description: 'Test Collection Description',
+            uri: `https://s.petsmem.site/c/${petsCollection.address}?q=uri`,
             image: `https://s.petsmem.site/c/${petsCollection.address}?q=image`
         });
     });
@@ -362,13 +355,6 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: 'https://s.petsmem.ru/c/',
-                data: {
-                    $$type: 'NftMutableMetaData',
-                    description: 'New Collection Description',
-                    uri: "ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/meta.json",
-                    image: "http://abcd.com/myimage.jpeg",
-                    imageData: null,
-                }
             }
         )
 
@@ -396,54 +382,14 @@ describe('PetsCollection Methods', () => {
             balanceClassB: 0n,
             fbMode: 0n,
             fbUri: "https://s.petsmem.ru/c/",
-            data: {
-                $$type: 'NftMutableMetaData',
-                description: "New Collection Description",
-                image: "http://abcd.com/myimage.jpeg",
-                imageData: null,
-                uri: "ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/meta.json",
-            }
         });
 
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
-            name: 'Test Collection',
-            description: 'New Collection Description',
-            image: "http://abcd.com/myimage.jpeg",
-            uri: "ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/meta.json",
-        });
-
-
-        const updateSettings2 = await petsCollection.send(
-            deployer.getSender(),
-            {
-                value: MaxTransactionAmount,
-            },
-            {
-                $$type: 'UpdateSettings',
-                feeStorage: 0x3An,
-                feeClassA: 0x30n,
-                feeClassB: 0n,
-                fbMode: 2n,
-                fbUri: 'https://s.petsmem.ru/c/',
-                data: {
-                    $$type: 'NftMutableMetaData',
-                    description: 'New Collection Description',
-                    uri: "https://abcd.com/mymeta.json",
-                    image: "ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/image.jpeg",
-                    imageData: null,
-                }
-            }
-        )
-
-        const data2 =  await petsCollection.getGetCollectionData();
-        const attributes2 = await decodeNftMetadata(data2.collectionContent);
-        expect(attributes2).toStrictEqual({
-            name: 'Test Collection',
-            description: 'New Collection Description',
-            image: `https://s.petsmem.ru/c/${petsCollection.address}?q=image&u=ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/image.jpeg`,
-            uri: "https://abcd.com/mymeta.json",
+            name: "Test Collection",
+            uri: `https://s.petsmem.ru/c/${petsCollection.address}?q=uri`,
+            image: `https://s.petsmem.ru/c/${petsCollection.address}?q=image`
         });
     });
 
@@ -460,7 +406,6 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
-                data: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_Unauthorized = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -484,7 +429,6 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
-                data: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_ErrorValidation = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -510,7 +454,6 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
-                data: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_InsufficientFunds = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -1074,7 +1017,7 @@ describe('PetMemoryNft Methods', () => {
         blockchain = await Blockchain.create();
         deployer = await blockchain.treasury('deployer');
 
-        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address, FallBackUri, CollectionMeta));
+        petsCollection = blockchain.openContract(await PetsCollection.fromInit(deployer.address));
 
         deployResult = await petsCollection.send(
             deployer.getSender(),

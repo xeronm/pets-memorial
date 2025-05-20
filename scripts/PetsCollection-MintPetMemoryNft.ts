@@ -58,12 +58,22 @@ const nftDataImageOffChain2: NftMutableMetaData = {
               " but he had an iron will to live. However, on 11/15/2024, he passed away."
 }
 
+const nftDataImageOffChain3: NftMutableMetaData = {
+  $$type: 'NftMutableMetaData',
+  uri: null,
+  //image: 'ipfs://bafybeidjs33bvmgjezfe6curhgymb3qipzefwy7tsaiqmfdc244qtx3hve',
+  image: 'ipfs://bafkreiaas3zoxflteg62larh4liileevmn53gsfzgntoaavtuuzgi36hmy',
+  imageData: null,
+  description: "Forever our playful shadow and loyal friend—your wagging tail and joyful spirit live on in our hearts." +
+              " Every squirrel you chased and every nap in the sun is a memory we’ll cherish with a smile."
+}
 
-const nftData = nftDataImageOnChain;
+// const nftData = nftDataImageOnChain;
 // const nftData = nftDataImageOffChain;
-// const nftData = nftDataImageOffChain2;
+const nftData = nftDataImageOffChain2;
+// const nftData = nftDataImageOffChain3;
 
-const nftImmData: PetMemoryNftImmutableData = {
+const nftImmDataMarcusCat: PetMemoryNftImmutableData = {
   $$type: 'PetMemoryNftImmutableData',
   species: 2n,
   name: 'Marcus',
@@ -77,6 +87,25 @@ const nftImmData: PetMemoryNftImmutableData = {
   birthDate: 0n,
   deathDate: 0x20241115n,
 }
+
+const nftImmDataBoomerDog: PetMemoryNftImmutableData = {
+  $$type: 'PetMemoryNftImmutableData',
+  species: 1n,
+  name: 'Boomer',
+  sex: 0n,
+  speciesName: null,
+  breed: 'Sibu-inu',
+  lang: 0x8Dn,         // "en"
+  countryCode: 0x234n, // "ru"
+  location: 'Krasnodar 350020',
+  geoPoint: 0x4010d91bb866n, // 45,046284 [N1=4198617], 38,981700 [N2=1816678]
+  birthDate: 0x20200000n,
+  deathDate: 0x20250101n,
+}
+
+const nftImmData = nftImmDataMarcusCat;
+// const nftImmData = nftImmDataBoomerDog;
+
 
 export async function run(provider: NetworkProvider, args: string[]) {
   const ui = provider.ui();
