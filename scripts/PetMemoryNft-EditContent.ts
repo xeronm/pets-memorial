@@ -11,7 +11,6 @@ const nftDataImageOffChain: NftMutableMetaData = {
   image: ':zl5frtaw6y3npei45avcjgpe',
   imageData: null,
   description: "Description was edited",
-  bagId: BigInt('0xBA53CDEB0361AE63213FD0C3E9909EF7E8BFEAEBEBB53B90731714ABCB39FB07')
 }
 
 const nftData = nftDataImageOffChain;
@@ -29,7 +28,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
   const nft = provider.open(PetMemoryNft.fromAddress(address));
 
   await nft.send(
-    provider.sender(), 
+    provider.sender(),
     {
       value: toNano('0.01'),
     },

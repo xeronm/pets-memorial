@@ -29,7 +29,7 @@ const nftDataImageOnChain: NftMutableMetaData = {
 const nftDataImageOffChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
-  image: 'ipfs://bafybeiaxrkfpyhiryq75mstavipmsc4r674huymxext4sf4jbzwtni26j4/marcus-1.jpg',
+  image: 'ipfs://bafybeib356rlhshb7uxlxgwkk4qh4kyrm2ewp4n5qm2yxu4z2yjghevism/marcus-1.webp',
   imageData: null,
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
               "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
@@ -69,8 +69,8 @@ const nftDataImageOffChain3: NftMutableMetaData = {
 }
 
 // const nftData = nftDataImageOnChain;
-// const nftData = nftDataImageOffChain;
-const nftData = nftDataImageOffChain2;
+const nftData = nftDataImageOffChain;
+// const nftData = nftDataImageOffChain2;
 // const nftData = nftDataImageOffChain3;
 
 const nftImmDataMarcusCat: PetMemoryNftImmutableData = {
