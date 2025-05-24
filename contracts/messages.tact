@@ -3,13 +3,13 @@ const MintPetMemoryNftFwdFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasAndFwdFeeMin: Int = MintPetMemoryNftFwdFeeMin + PetMemoryNftTransferGasFeeMin;
 
-const DonateGasFeeMin: Int = ton("0.007");
-const DonateReplyGasFeeMin: Int = ton("0.008");
+const DonateGasFeeMin: Int = ton("0.006");
+const DonateReplyGasFeeMin: Int = ton("0.007");
 
 const SecondsInYear: Int = 31536000; // 365 * 24 * 60 * 60
+const MaxFeeDueSeconds: Int = 126144000; // SecondsInYear * 4
 
 const MinFeeStorage: Int = 0x38; // 0.01 TON
-const MinFeeClassA: Int = 0x30; // 0.001 TON
 
 const FallbackModeNone: Int = 0x0;
 const FallbackModeBasic: Int = 0x1;

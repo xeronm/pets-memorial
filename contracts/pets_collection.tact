@@ -100,7 +100,13 @@ contract PetsCollection {
     receive(msg: MintPetMemoryNft) {
         let storageReserve: Int = unpackQint(self.feeStorage);
         let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
-        let feeClassB: Int = unpackQint(max(msg.feeClassB, self.feeClassB));
+        let feeClassB: Int = unpackQint(self.feeClassB);
+        let feeDueTime: Int = SecondsInYear;
+        if (msg.feeClassB > self.feeClassB && feeClassB > 0) {
+            let _feeClassB = unpackQint(msg.feeClassB);
+            feeDueTime = (_feeClassB * SecondsInYear) / feeClassB;
+            feeClassB = _feeClassB;
+        }
         let ctx = context();
         let fwdFee: Int = ctx.readForwardFee(); // we use fwdFee to estimate deploy message fee
 
@@ -126,7 +132,7 @@ contract PetsCollection {
                     immData: msg.content.immData,
                     data: msg.content.data,
                     storageReserve: self.feeStorage,
-                    feeDueTime: now() + (feeClassB * SecondsInYear) / unpackQint(self.feeClassB)
+                    feeDueTime: now() + feeDueTime
                 }.toCell(),
             }.toCell(),
             init: nftInit
@@ -137,7 +143,7 @@ contract PetsCollection {
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), msg.index);
         throwUnless(ErrorNotAuthorized, sender() == contractAddress(nftInit));
 
-        let feeClassA: Int = unpackQint(max(msg.feeClassA, MinFeeClassA));
+        let feeClassA: Int = unpackQint(msg.feeClassA);
         let feeClassB: Int = unpackQint(msg.feeClassB);
 
         let ctx = context();
@@ -152,7 +158,7 @@ contract PetsCollection {
             mode: SendDefaultMode,
             bounce: false,
             body: DonateReply{
-                feeDueTimeAdd: (feeClassB * SecondsInYear) / unpackQint(self.feeClassB)
+                feeDueTimeAdd: (self.feeClassB > 0 ? (feeClassB * SecondsInYear) / unpackQint(self.feeClassB) : 0)
             }.toCell()
         });
     }
@@ -197,7 +203,7 @@ contract PetsCollection {
 
     receive(msg: UpdateSettings) {
         throwUnless(ErrorNotAuthorized, sender() == self.owner);
-        throwUnless(ErrorValidation, msg.feeStorage >= MinFeeStorage && msg.feeClassA >= MinFeeClassA);
+        throwUnless(ErrorValidation, msg.feeStorage >= MinFeeStorage);
         self.feeStorage = msg.feeStorage;
         self.feeClassA = msg.feeClassA;
         self.feeClassB = msg.feeClassB;

@@ -62,28 +62,28 @@ function extractOp(body: Cell): number | undefined {
     }
 }
 
-export function transactionReport(subject: BlockchainTransaction[], opcodes: {[name: string]: number}, 
-    addrNames: {[name: string]: Address | undefined}): TxReportRecord[] 
+export function transactionReport(subject: BlockchainTransaction[], opcodes: {[name: string]: number},
+    addrNames: {[name: string]: Address | undefined}): TxReportRecord[]
 {
-    const opMap = Object.entries(opcodes).reduce((agg, [k, v]) => 
+    const opMap = Object.entries(opcodes).reduce((agg, [k, v]) =>
         (agg.set(v, k), agg), new Map<number, string>());
-    const addrMap = Object.entries(addrNames).reduce((agg, [k, v]) => 
+    const addrMap = Object.entries(addrNames).reduce((agg, [k, v]) =>
         (v && agg.set(v.toString(), k), agg), new Map<string, string>());
-    
+
     const report: TxReportRecord[] = [];
     let i = 0;
 
-    
-    return subject.map(txRaw => { 
+
+    return subject.map(txRaw => {
         if (txRaw.description.type !== 'generic') return undefined;
         const tx = flattenTransaction(txRaw);
 
         const outMessages = txRaw.outMessages.values()
-            .map(m => {                
+            .map(m => {
                 const op = extractOp(m.body);
 
                 return {
-                    opCode: op, 
+                    opCode: op,
                     op: op ? opMap.get(op) : undefined,
                     forwardFee: (m.info.type === 'internal') ? m.info.forwardFee : undefined,
                 }
@@ -122,7 +122,7 @@ export function transactionAmountFlow(subject: BlockchainTransaction[]): TxAmout
         totalFees: 0n,
     };
 
-    if (!subject.length || subject[0].inMessage?.info.type !== 'external-in' || 
+    if (!subject.length || subject[0].inMessage?.info.type !== 'external-in' ||
         !(subject[0].inMessage.info.dest instanceof Address)) return flow;
 
     const sender: Address = subject[0].inMessage.info.dest;
@@ -176,14 +176,14 @@ function toHaveTransactionSeq(subject: BlockchainTransaction[], cmp: Transaction
         if ((txDesc.actionResultCode != undefined) && (tx.actionResultCode != txDesc.actionResultCode)) {
             pass = false;
             txMessage.push(`actionCode(${tx.actionResultCode}) != ${txDesc.actionResultCode};`);
-        }        
+        }
         if (tx.success != (txDesc.success ?? true)) {
             pass = false;
-            txMessage.push(`success(${tx.success}) != ${txDesc.success ?? true};`);
+            txMessage.push(`success(${tx.success}) != ${txDesc.success ?? true}; exitCode=${tx.exitCode}`);
         }
         if (txDesc.deploy != null && tx.deploy != txDesc.deploy) {
             pass = false;
-            txMessage.push(`success(${tx.deploy}) != ${txDesc.deploy};`);
+            txMessage.push(`success(${tx.deploy}) != ${txDesc.deploy}; exitCode=${tx.exitCode}`);
         }
 
         if ((txDesc.totalFeesLower != undefined) && ((tx.totalFees === undefined) || (tx.totalFees < txDesc.totalFeesLower))) {
@@ -195,12 +195,12 @@ function toHaveTransactionSeq(subject: BlockchainTransaction[], cmp: Transaction
             txMessage.push(`totalFees(${fromNano(tx.totalFees || 0)}) <= ${fromNano(txDesc.totalFeesUpper)};`);
         }
 
-        if ((txDesc.valueLower != undefined) && ((tx.value === undefined) || (tx.value < txDesc.valueLower))) 
+        if ((txDesc.valueLower != undefined) && ((tx.value === undefined) || (tx.value < txDesc.valueLower)))
         {
             pass = false;
             txMessage.push(`value(${fromNano(tx.value ?? 0)}) >= ${fromNano(txDesc.valueLower)};`);
         }
-        if ((txDesc.valueUpper != undefined) && ((tx.value === undefined) || (tx.value > txDesc.valueUpper))) 
+        if ((txDesc.valueUpper != undefined) && ((tx.value === undefined) || (tx.value > txDesc.valueUpper)))
             {
                 pass = false;
                 txMessage.push(`value(${fromNano(tx.value ?? 0)}) <= ${fromNano(txDesc.valueUpper)};`);
@@ -210,18 +210,18 @@ function toHaveTransactionSeq(subject: BlockchainTransaction[], cmp: Transaction
             messages.push(`expected TX #${i} mistmatch: `+txMessage.join(' '));
         }
         i++;
-    }      
+    }
 
     return {
         message: () => messages.join('\n'),
         pass,
-    }    
+    }
 }
 
 function toAlmostEqualTons(subject: bigint, cmp: bigint) {
     let diff = subject - cmp;
     if (diff < 0) diff = -diff;
-    // @ts-ignore    
+    // @ts-ignore
     if (this.isNot) {
         expect(diff).not.toBeLessThanOrEqual(10n);
     }
