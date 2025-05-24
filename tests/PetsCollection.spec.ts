@@ -424,7 +424,7 @@ describe('PetsCollection Methods', () => {
             },
             {
                 $$type: 'UpdateSettings',
-                feeStorage: 0x3An,
+                feeStorage: 0n,
                 feeClassA: 0n,
                 feeClassB: 0n,
                 fbMode: 0n,
@@ -777,11 +777,106 @@ describe('PetsCollection Methods', () => {
             expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
             const content = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
             expect(content.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime);
+            expect(content.feeDueTime).toBeLessThanOrEqual(expectedDueTime + 60n);
 
             const info2 = await petsCollection.getGetInfo();
             expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA + toNano("0.025"));
             expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + toNano("0.025") + MaxClassABalanceDifference);
             expect(info2.balanceClassB).toBe(info1.balanceClassB + toNano("0.05"));
+            expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
+        }
+    });
+
+    it('MintPetMemoryNft: shloud mint NFT for sender with double fee classB', async () => {
+        const expectedDueTime = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60 * 2);
+        const info1 = await petsCollection.getGetInfo();
+        const { mintNftResult, nftItem } = await mintNft(0n, 0x40n);
+
+        resultReport.details.MintPetMemoryNft_CustomFee = transactionReport(mintNftResult.transactions, PetsCollection.opcodes,
+            {...addrNames, NftItem: nftItem?.address});
+
+        resultReport.flows.MintPetMemoryNft_CustomFee = transactionAmountFlow(mintNftResult.transactions);
+
+        expect(mintNftResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address},
+            {from: petsCollection.address, deploy: true},
+        ]);
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const contract = await blockchain.getContract(nftItem.address);
+            resultReport.flows.MintPetMemoryNft.nftBalance = contract.balance;
+            expect(contract.balance).toBe(toNano("0.05"));
+
+            const nftData2 = await nftItem.getGetNftData();
+            expect(nftData2.isInitialized).toBe(true);
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
+            const content = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime);
+            expect(content.feeDueTime).toBeLessThanOrEqual(expectedDueTime + 60n);
+
+            const info2 = await petsCollection.getGetInfo();
+            expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA + toNano("0.025"));
+            expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + toNano("0.025") + MaxClassABalanceDifference);
+            expect(info2.balanceClassB).toBe(info1.balanceClassB + toNano("0.1"));
+            expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
+        }
+    });
+
+    it('MintPetMemoryNft: shloud mint NFT for sender with zero fees', async () => {
+        const updateSettings = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'UpdateSettings',
+                feeStorage: 0x3Cn,
+                feeClassA: 0n,
+                feeClassB: 0n,
+                fbMode: 0n,
+                fbUri: null,
+            }
+        )
+
+        expect(updateSettings.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: deployer.address},
+        ]);
+
+        const expectedDueTime = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60 * 1);
+        const info1 = await petsCollection.getGetInfo();
+
+        const { mintNftResult, nftItem } = await mintNft(0n, 0x40n);
+        resultReport.details.MintPetMemoryNft_ZeroFees = transactionReport(mintNftResult.transactions, PetsCollection.opcodes,
+            {...addrNames, NftItem: nftItem?.address});
+
+        resultReport.flows.MintPetMemoryNft_ZeroFees = transactionAmountFlow(mintNftResult.transactions);
+
+        expect(mintNftResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address},
+            {from: petsCollection.address, deploy: true},
+        ]);
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const contract = await blockchain.getContract(nftItem.address);
+            resultReport.flows.MintPetMemoryNft.nftBalance = contract.balance;
+            expect(contract.balance).toBe(toNano("0.05"));
+
+            const nftData2 = await nftItem.getGetNftData();
+            expect(nftData2.isInitialized).toBe(true);
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
+            const content = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime);
+
+            const info2 = await petsCollection.getGetInfo();
+            expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA);
+            expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + MaxClassABalanceDifference * 2n); // Consumes less computation gas
+            expect(info2.balanceClassB).toBe(info1.balanceClassB);
             expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
         }
     });
@@ -1462,8 +1557,7 @@ describe('PetMemoryNft Methods', () => {
         }
     });
 
-
-    it('Donate: should donate to collection', async () => {
+    it('Donate: should donate to collection and prolong feeDueTime', async () => {
         const expectedDueTime1 = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
         const { nftItem } = await mintNft();
 
@@ -1474,6 +1568,7 @@ describe('PetMemoryNft Methods', () => {
             const nftData1 = await nftItem.getGetNftData();
             const content1 = loadPetMemoryNftContent(nftData1.individualContent.asSlice());
             expect(content1.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime1);
+            expect(content1.feeDueTime).toBeLessThanOrEqual(expectedDueTime1 + 60n);
 
             const donateResult = await nftItem.send(
                 nftUser.getSender(),
@@ -1501,12 +1596,124 @@ describe('PetMemoryNft Methods', () => {
 
             const nftData2 = await nftItem.getGetNftData();
             const content2 = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
-            expect(content2.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime1 + (365n * 24n * 60n * 60n));
+            const expectedDueTime2 = expectedDueTime1 + (365n * 24n * 60n * 60n);
+            expect(content2.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime2);
+            expect(content2.feeDueTime).toBeLessThanOrEqual(expectedDueTime2 + 60n);
 
             const info2 = await petsCollection.getGetInfo();
             expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA);
             expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + MaxClassABalanceDifference);
             expect(info2.balanceClassB).toBe(info1.balanceClassB + toNano("0.05"));
+            expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
+        }
+    });
+
+    it('Donate: should donate to collection with zero fees and Not prolong feeDueTime', async () => {
+        const updateSettings = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'UpdateSettings',
+                feeStorage: 0x3Cn,
+                feeClassA: 0n,
+                feeClassB: 0n,
+                fbMode: 0n,
+                fbUri: null,
+            }
+        )
+
+        expect(updateSettings.transactions).toHaveTransactionSeq([
+            {},
+            {from: deployer.address, to: petsCollection.address},
+            {from: petsCollection.address, to: deployer.address},
+        ]);
+
+        const expectedDueTime1 = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
+        const { nftItem } = await mintNft();
+
+        expect(nftItem).toBeDefined();
+        if (nftItem) {
+            const info1 = await petsCollection.getGetInfo();
+
+            const nftData1 = await nftItem.getGetNftData();
+            const content1 = loadPetMemoryNftContent(nftData1.individualContent.asSlice());
+            expect(content1.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime1);
+            expect(content1.feeDueTime).toBeLessThanOrEqual(expectedDueTime1 + 60n);
+
+            const donateResult = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: MaxTransactionAmount
+                },
+                {
+                    $$type: 'DonateCollection',
+                    feeClassA: 0n,
+                    feeClassB: 0x3Cn,
+                }
+            );
+
+            expect(donateResult.transactions).toHaveTransactionSeq([
+                {},
+                {from: nftUser.address, to: nftItem.address},
+                {from: nftItem.address, to: petsCollection.address},
+                {from: petsCollection.address, to: nftItem.address},
+            ]);
+
+            const nftData2 = await nftItem.getGetNftData();
+            const content2 = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content2.feeDueTime).toBe(content1.feeDueTime);
+
+            const info2 = await petsCollection.getGetInfo();
+            expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA);
+            expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + MaxClassABalanceDifference * 2n);
+            expect(info2.balanceClassB).toBe(info1.balanceClassB + toNano("0.05"));
+            expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
+        }
+    });
+
+    it('Donate: should donate to collection and prolong feeDueTime with respect to limit', async () => {
+        const expectedDueTime1 = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
+        const { nftItem } = await mintNft();
+
+        expect(nftItem).toBeDefined();
+        if (nftItem) {
+            const info1 = await petsCollection.getGetInfo();
+
+            const nftData1 = await nftItem.getGetNftData();
+            const content1 = loadPetMemoryNftContent(nftData1.individualContent.asSlice());
+            expect(content1.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime1);
+            expect(content1.feeDueTime).toBeLessThanOrEqual(expectedDueTime1 + 60n);
+
+            const donateResult = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: toNano("1.5")
+                },
+                {
+                    $$type: 'DonateCollection',
+                    feeClassA: 0n,
+                    feeClassB: 0x48n,
+                }
+            );
+            expect(donateResult.transactions).toHaveTransactionSeq([
+                {},
+                {from: nftUser.address, to: nftItem.address},
+                {from: nftItem.address, to: petsCollection.address},
+                {from: petsCollection.address, to: nftItem.address},
+            ]);
+
+            const nftData2 = await nftItem.getGetNftData();
+            const content2 = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            const expectedDueTime2 = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60 * 4);
+            expect(content2.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime2);
+            expect(content2.feeDueTime).toBeLessThanOrEqual(expectedDueTime2 + 60n);
+
+            const info2 = await petsCollection.getGetInfo();
+            expect(info2.balanceClassA).toBeGreaterThanOrEqual(info1.balanceClassA);
+            expect(info2.balanceClassA).toBeLessThanOrEqual(info1.balanceClassA + MaxClassABalanceDifference);
+            expect(info2.balanceClassB).toBe(info1.balanceClassB + toNano("1"));
             expect(info2.balance).toBeGreaterThanOrEqual(info1.balance);
         }
     });

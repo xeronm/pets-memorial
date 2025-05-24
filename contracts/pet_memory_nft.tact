@@ -37,7 +37,8 @@ contract PetMemoryNft {
 
     receive(msg: DonateReply) {
         throwUnless(ErrorNotAuthorized, sender() == self.collectionAddress);
-        self.feeDueTime = max(self.feeDueTime, now()) + msg.feeDueTimeAdd;
+        let currTime: Int = now();
+        self.feeDueTime = min(max(self.feeDueTime, currTime) + msg.feeDueTimeAdd, currTime + MaxFeeDueSeconds);
         cashback(self.owner!!);
     }
 
