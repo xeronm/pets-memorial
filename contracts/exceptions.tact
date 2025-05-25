@@ -1,10 +1,3 @@
-const ErrorAssertion: String = "Internal Error";
-const ErrorValidation: String = "Validation error";
-const ErrorInsufficientFunds: String = "Insufficient funds for operation";
-const ErrorMaxAuthItemCount: String = "Maximum AuthItem count reached";
-const ErrorNotAuthorized: String = "Not authorized";
-const ErrorVoteInProgress: String = "Vote already in progress";
-const ErrorVoteDuplicated: String = "Vote duplicated";
-const ErrorVoteInvalidState: String = "Vote has invalid state";
-const ErrorVoteExpired: String = "Vote expired";
-const ErrorPendingTransaction: String = "Pending Transaction";
+const ErrorNotAuthorized: Int = 401;
+const ErrorValidation: Int = 402;
+const ErrorInsufficientFunds: Int = 403;

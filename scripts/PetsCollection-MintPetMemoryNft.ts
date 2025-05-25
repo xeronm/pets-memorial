@@ -1,8 +1,8 @@
 import { Address, toNano  } from '@ton/core';
-import { 
-  PetsCollection, 
-  NftMutableMetaData, 
-  PetMemoryNftImmutableData 
+import {
+  PetsCollection,
+  NftMutableMetaData,
+  PetMemoryNftImmutableData
 } from '../wrappers/PetsCollection';
 import { toTextCellSnake } from '../utils/nftContent';
 import { PetMemoryNft } from '../wrappers/PetMemoryNft';
@@ -14,31 +14,29 @@ const nftDataImageOnChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
   image: null,
-  imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-1-onchain-128x128.jpg')),
-  bagId: null,
+  imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-2-onchain-256x256.jpg')),
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
               "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
               " out of an abandoned private house, looked at people with piercing emerald eyes," +
               " and screamed. We tried to feed him, but that day I realized that if he did not" +
               " run out at some day, I would not be able to forgive myself. An hour later, my" +
-              " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
+              " wife and I caught him.\nIt was a former domestic, neutered cat, 10-12 years old," +
               " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
               " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
               " but he had an iron will to live. However, on 11/15/2024, he passed away."
 }
 
-const nftDataImageOffChain1: NftMutableMetaData = {
+const nftDataImageOffChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
-  image: 'https://muratov.xyz/petsmem/images/marcus-1.jpg',
-  imageData: null, 
-  bagId: null,
+  image: 'ipfs://bafybeib356rlhshb7uxlxgwkk4qh4kyrm2ewp4n5qm2yxu4z2yjghevism/marcus-1.webp',
+  imageData: null,
   description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
               "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
               " out of an abandoned private house, looked at people with piercing emerald eyes," +
               " and screamed. We tried to feed him, but that day I realized that if he did not" +
               " run out at some day, I would not be able to forgive myself. An hour later, my" +
-              " wife and I caught him. It was a former domestic, neutered cat, 10-12 years old," +
+              " wife and I caught him.\nIt was a former domestic, neutered cat, 10-12 years old," +
               " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
               " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
               " but he had an iron will to live. However, on 11/15/2024, he passed away."
@@ -49,13 +47,33 @@ const nftDataImageOffChain2: NftMutableMetaData = {
   uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
   image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
   imageData: null,
-  description: "On-chain overriden description",
-  bagId: null,
+  description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
+              "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
+              " out of an abandoned private house, looked at people with piercing emerald eyes," +
+              " and screamed. We tried to feed him, but that day I realized that if he did not" +
+              " run out at some day, I would not be able to forgive myself. An hour later, my" +
+              " wife and I caught him.\nIt was a former domestic, neutered cat, 10-12 years old," +
+              " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
+              " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
+              " but he had an iron will to live. However, on 11/15/2024, he passed away."
 }
 
-const nftData = nftDataImageOffChain1;
+const nftDataImageOffChain3: NftMutableMetaData = {
+  $$type: 'NftMutableMetaData',
+  uri: null,
+  //image: 'ipfs://bafybeidjs33bvmgjezfe6curhgymb3qipzefwy7tsaiqmfdc244qtx3hve',
+  image: 'ipfs://bafkreiaas3zoxflteg62larh4liileevmn53gsfzgntoaavtuuzgi36hmy',
+  imageData: null,
+  description: "Forever our playful shadow and loyal friend—your wagging tail and joyful spirit live on in our hearts." +
+              " Every squirrel you chased and every nap in the sun is a memory we’ll cherish with a smile."
+}
 
-const nftImmData: PetMemoryNftImmutableData = {
+// const nftData = nftDataImageOnChain;
+const nftData = nftDataImageOffChain;
+// const nftData = nftDataImageOffChain2;
+// const nftData = nftDataImageOffChain3;
+
+const nftImmDataMarcusCat: PetMemoryNftImmutableData = {
   $$type: 'PetMemoryNftImmutableData',
   species: 2n,
   name: 'Marcus',
@@ -65,10 +83,29 @@ const nftImmData: PetMemoryNftImmutableData = {
   lang: 0x8Dn,         // "en"
   countryCode: 0x234n, // "ru"
   location: 'Krasnodar 350020',
-  geoPoint: 0x4010d91bb866n, // 45,046284 [N1=4198617], 38,981700 [N2=1816678] 
+  geoPoint: 0x4010d91bb866n, // 45,046284 [N1=4198617], 38,981700 [N2=1816678]
   birthDate: 0n,
   deathDate: 0x20241115n,
 }
+
+const nftImmDataBoomerDog: PetMemoryNftImmutableData = {
+  $$type: 'PetMemoryNftImmutableData',
+  species: 1n,
+  name: 'Boomer',
+  sex: 0n,
+  speciesName: null,
+  breed: 'Sibu-inu',
+  lang: 0x8Dn,         // "en"
+  countryCode: 0x234n, // "ru"
+  location: 'Krasnodar 350020',
+  geoPoint: 0x4010d91bb866n, // 45,046284 [N1=4198617], 38,981700 [N2=1816678]
+  birthDate: 0x20200000n,
+  deathDate: 0x20250101n,
+}
+
+const nftImmData = nftImmDataMarcusCat;
+// const nftImmData = nftImmDataBoomerDog;
+
 
 export async function run(provider: NetworkProvider, args: string[]) {
   const ui = provider.ui();
@@ -85,7 +122,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
   let collDataBefore = await petsCollection.getGetCollectionData();
 
   await petsCollection.send(
-    provider.sender(), 
+    provider.sender(),
     {
       value: toNano('0.25')
     },
@@ -124,5 +161,5 @@ export async function run(provider: NetworkProvider, args: string[]) {
   console.log('NFT Info:', await nft.getGetNftData());
 
   ui.clearActionPrompt();
-  ui.write('Deployed successfully!');  
+  ui.write('Deployed successfully!');
 }

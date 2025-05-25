@@ -71,10 +71,8 @@
             i -= 4;
             string~store_uint(((n >> i) & 0xF) + 48, 8);
             if ((i == 16) | (i == 8)) {
-                if ((n >> (i - 8)) & 0xFF) {
-                    string~store_uint(45, 8); ;; "-"
-                }
-                else {
+                string~store_uint(45, 8); ;; "-"
+                if ((n >> (i - 8)) & 0xFF == 0) {
                     string~store_uint(42, 8); ;; "*"
                     i = 0;
                 }

@@ -1,5 +1,5 @@
 
-import { adnlIdDecode, adnlIdEncode } from './adnl-id';
+import { adnlIdDecode, adnlIdEncode } from '../adnl-id';
 
 const AdnlIdDecoded = '3D94F73794CA3C511C486574BB55A5B7F4F747A4E2ACA618479A77BC841111D1';
 const AdnlIdEncoded = 'u6zj5zxstfdyui4jbsxjo2vuw37j52hutrkzjqyi6nhppeecei5cjex';

@@ -7,7 +7,7 @@ import { NetworkProvider } from '@ton/blueprint';
 //   console.log('Starting Request', request.url, JSON.stringify(request.data, null, 2))
 //   return request
 // })
-    
+
 // axios.interceptors.response.use(response => {
 //   console.log('Response:', response.config.url, JSON.stringify(response.data, null, 2))
 //   return response
@@ -25,6 +25,6 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   const petsCollection = provider.open(PetsCollection.fromAddress(address));
 
-  console.log('Info: ', await petsCollection.getInfo());
+  console.log('Info: ', await petsCollection.getGetInfo());
   console.log('Collection Data: ', await petsCollection.getGetCollectionData());
 }

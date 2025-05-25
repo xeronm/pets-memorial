@@ -1,5 +1,5 @@
 import { toNano } from '@ton/core';
-import { PetsCollection } from '../wrappers/PetsCollection';
+import { PetsCollection, NftMutableMetaData } from '../wrappers/PetsCollection';
 import { NetworkProvider } from '@ton/blueprint';
 
 console.log(process.env.WALLET_MNEMONIC);
@@ -25,12 +25,12 @@ export async function run(provider: NetworkProvider) {
             value: toNano('0.25'),
         },
         {
-            $$type: 'Deploy',
+            $$type: 'Deploy'
         }
     );
 
     await provider.waitForDeploy(petsCollection.address);
-    const info = await petsCollection.getInfo();
+    const info = await petsCollection.getGetInfo();
 
     console.log('Info: ', info);
 }

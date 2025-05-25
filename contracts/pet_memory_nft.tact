@@ -6,7 +6,7 @@ contract PetMemoryNft {
     override const storageReserve: Int = ton("0.01");
 
     collectionAddress: Address;
-    index: Int as uint40;    
+    index: Int as uint40;
     owner: Address?;
     immData: PetMemoryNftImmutableData?;
     data: NftMutableMetaData?;
@@ -21,7 +21,7 @@ contract PetMemoryNft {
     }
 
     receive(msg: DonateCollection) {
-        require(sender() == self.owner!!, "ErrorNotAuthorized");
+        throwUnless(ErrorNotAuthorized, sender() == self.owner!!);
         message(MessageParameters{
             to: self.collectionAddress,
             value: 0,
@@ -32,19 +32,20 @@ contract PetMemoryNft {
                 feeClassA: msg.feeClassA,
                 feeClassB: msg.feeClassB
             }.toCell()
-        }); 
+        });
     }
 
     receive(msg: DonateReply) {
-        require(sender() == self.collectionAddress, "ErrorNotAuthorized");
-        self.feeDueTime = max(self.feeDueTime, now()) + msg.feeDueTimeAdd;
+        throwUnless(ErrorNotAuthorized, sender() == self.collectionAddress);
+        let currTime: Int = now();
+        self.feeDueTime = min(max(self.feeDueTime, currTime) + msg.feeDueTimeAdd, currTime + MaxFeeDueSeconds);
         cashback(self.owner!!);
     }
 
     receive(msg: Transfer){
         let isInitialized: Bool = self.owner != null;
-        require(sender() == (isInitialized ? self.owner!! : self.collectionAddress), "ErrorNotAuthorized");
-        let storageReserve: Int = self.storageReserve;      
+        throwUnless(ErrorNotAuthorized, sender() == (isInitialized ? self.owner!! : self.collectionAddress));
+        let storageReserve: Int = self.storageReserve;
         if (!isInitialized) {
             let init = PetMemoryNftInit.fromCell(msg.customPayload);
             self.immData = init.immData;
@@ -53,7 +54,7 @@ contract PetMemoryNft {
             storageReserve = unpackQint(init.storageReserve);
         }
 
-        self.owner = msg.newOwner;        
+        self.owner = msg.newOwner;
         let needResp: Bool = msg.responseDestination != null && msg.responseDestination != newAddress(0, 0);
         if (msg.forwardAmount > 0 || needResp) {
             nativeReserve(storageReserve, ReserveExact);
@@ -79,8 +80,8 @@ contract PetMemoryNft {
                     body: Excesses{
                         queryId: msg.queryId
                     }.toCell()
-                }); 
-            }        
+                });
+            }
         }
     }
 
@@ -95,18 +96,18 @@ contract PetMemoryNft {
                 indexId: self.index,
                 collection: self.collectionAddress
             }.toCell()
-        });     
+        });
     }
 
     receive(msg: EditContent) {
-        require(sender() == self.owner, "ErrorNotAuthorized");
+        throwUnless(ErrorNotAuthorized, sender() == self.owner);
         self.data = msg.data;
 
         cashback(sender());
-    }    
+    }
 
     receive(msg: Destroy) {
-        require(sender() == self.owner, "ErrorNotAuthorized");
+        throwUnless(ErrorNotAuthorized, sender() == self.owner);
         self.owner = null;
         message(MessageParameters{
             to: sender(),
@@ -115,13 +116,13 @@ contract PetMemoryNft {
             mode: SendRemainingBalance + SendDestroyIfZero,
             body: null
         });
-    }    
+    }
 
     get fun get_nft_data(): GetNftData {
         return GetNftData {
-            isInitialized: self.owner != null, 
-            index: self.index, 
-            collectionAddress: self.collectionAddress, 
+            isInitialized: self.owner != null,
+            index: self.index,
+            collectionAddress: self.collectionAddress,
             ownerAddress: self.owner!!,
             individualContent: PetMemoryNftContent{
                 immData: self.immData!!,
