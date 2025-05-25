@@ -15,8 +15,7 @@ Edit constants at `pets_collection.tact`
 
 ```ts
 const PetsCollectionName: String = "<Collection name>";
-const PetsCollectionDescription: String = "<Collection description>";
-const DefaultPrefixUri: String = "<Collection content apiRoot>";
+const DefaultFallback: String = "<Collection content fallback URI apiPrefix>";
 ```
 
 #### Build and Test
