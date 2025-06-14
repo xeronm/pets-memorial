@@ -12,7 +12,7 @@ struct Info {
     balanceClassA: Int as coins;
     balanceClassB: Int as coins;
     //
-    fbMode: Int as uint2;
+    fbMode: Int as uint3;
     fbUri: String;
 }
 
@@ -24,6 +24,9 @@ const FieldName: Int = sha256("name");
 const FieldDescription: Int = sha256("description");
 const FieldImage: Int = sha256("image");
 const FieldImageData: Int = sha256("image_data");
+const FieldAttributes: Int = sha256("attributes");
+const FieldTraitType: Int = sha256("trait_type");
+const FieldValue: Int = sha256("value");
 
 const PetsCollectionName: String = "Test Collection";
 
@@ -56,9 +59,9 @@ fun encodeNftMetadataContent(name: String, uri: String?, description: String?, i
 }
 
 fun makeUri(fbUri: String, fbMode: Int, address: String, qtype: String, uri: String?): String {
-    if (uri == null || (fbMode != 0 && uri!!.asSlice().loadUint(32) != ascii("http"))) {
+    if (uri == null || ((fbMode & FallbackModeBitNonHttp) != 0 && uri!!.asSlice().loadUint(32) != ascii("http"))) {
         let newUri = beginString().concat(fbUri).concat(address).concat("?q=").concat(qtype);
-        if (fbMode == FallbackModeExt && uri != null) {
+        if ((fbMode & FallbackModeBitUrlQuery) != 0 && uri != null) {
             newUri = newUri.concat("&u=").concat(uri!!);
         }
         return newUri.toString();
@@ -83,7 +86,7 @@ contract PetsCollection {
     feeClassA: Int as uint8 = 0x3A; // 0.025 TON
     feeClassB: Int as uint8 = 0x3C; // 0.05 TON
     //
-    fbMode: Int as uint2 = FallbackModeBasic;
+    fbMode: Int as uint3 = FallbackModeBitNonHttp | FallbackModeBitEnvelopUri;
     fbUri: String = DefaultFallback;
 
     init(owner: Address) {
@@ -227,7 +230,7 @@ contract PetsCollection {
             makeUri(self.fbUri, 0, address, ContentTypeUri, null),
             null,
             makeUri(self.fbUri, 0, address, ContentTypeImage, null),
-            null
+            null,
         );
 
         return CollectionData{
@@ -248,17 +251,18 @@ contract PetsCollection {
         let uri: String? = null;
         let image: String? = null;
         let imageData: Cell? = null;
-
         // PetMemoryNFT
         let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent);
 
+        let speciesName: String = (content.immData.speciesName != null) ? content.immData.speciesName!! : speciesToName(content.immData.species);
         nameStr = nameStr.concat(content.immData.name)
             .concat(", ")
-            .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : speciesToName(content.immData.species));
+            .concat(speciesName);
 
         // TODO: Add serialization depends on serialization mask each bit for each feature
         if (content.immData.countryCode > 0) {
-            nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
+            let country: String = bcd2cToString(content.immData.countryCode);
+            nameStr = nameStr.concat(", ").concat(country);
         }
 
         if (content.immData.location != null) {
@@ -266,16 +270,21 @@ contract PetsCollection {
         }
 
         if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
+            let birth: String = dateMaskToString(content.immData.birthDate);
+            let death: String = dateMaskToString(content.immData.deathDate);
             nameStr = nameStr.concat(" (")
-                .concat(dateMaskToString(content.immData.birthDate))
+                .concat(birth)
                 .concat(" ~ ")
-                .concat(dateMaskToString(content.immData.deathDate))
+                .concat(death)
                 .concat(")");
         }
 
         let address: String = contractAddress(initOf PetMemoryNft(myAddress(), index)).toString();
 
-        if (content.data.uri != null) {
+        if ((self.fbMode & FallbackModeBitEnvelopUri) != 0) {
+            uri = makeUri(self.fbUri, self.fbMode, address, ContentTypeUri, null);
+        }
+        else if (content.data.uri != null) {
             uri = makeUri(self.fbUri, self.fbMode, address, ContentTypeUri, content.data.uri);
         }
         description = content.data.description;
