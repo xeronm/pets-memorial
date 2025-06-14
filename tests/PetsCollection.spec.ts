@@ -286,7 +286,6 @@ describe('PetsCollection Methods', () => {
     });
 
     it('<Get>: get_info()', async () => {
-
         // 2. Collection Info
         const info = await petsCollection.getGetInfo();
         expect(info).toEqual({
@@ -297,7 +296,7 @@ describe('PetsCollection Methods', () => {
             balance: StorageTonsReserve.Collection,
             balanceClassA: toNano("0.05"),
             balanceClassB: 0n,
-            fbMode: 1n,
+            fbMode: 5n,
             fbUri: "https://s.petsmem.site/c/",
         });
     });
@@ -1294,7 +1293,7 @@ describe('PetMemoryNft Methods', () => {
 
             const attributes = await decodeNftMetadata(nftContent);
             expect(attributes.description).toBe(nftData.description);
-            expect(attributes.uri).toBe(nftData.uri);
+            expect(attributes.uri).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=uri`);
             expect(attributes.image).toBe(nftData.image);
             expect(attributes.name).toBe('Marcus, Cat, RU, Krasnodar 350020 (2012-* ~ 2024-11-15)');
             expect(attributes.image_data.length).toBeGreaterThan(3000);
@@ -1338,7 +1337,8 @@ describe('PetMemoryNft Methods', () => {
             const attributes1 = await decodeNftMetadata(nftContent1);
             expect(attributes1.description).toBe('Overriden Description');
             expect(attributes1.image).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=image`);
-            expect(attributes1.uri).toBeUndefined();
+            expect(attributes1.uri).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=uri`);
+            // expect(attributes1.uri).toBeUndefined();
 
 
             const editResult2 = await nftItem.send(
@@ -1368,7 +1368,7 @@ describe('PetMemoryNft Methods', () => {
             const attributes2 = await decodeNftMetadata(nftContent2);
             expect(attributes2.image).toBeUndefined();
             expect(attributes2.description).toBe(nftData.description);
-            expect(attributes2.uri).toBe(nftData.uri);
+            expect(attributes2.uri).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=uri`);
             expect(attributes2.image_data.length).toBeGreaterThan(3000);
 
 

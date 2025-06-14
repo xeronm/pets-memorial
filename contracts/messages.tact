@@ -11,19 +11,10 @@ const MaxFeeDueSeconds: Int = 126144000; // SecondsInYear * 4
 
 const MinFeeStorage: Int = 0x38; // 0.01 TON
 
-const FallbackModeNone: Int = 0x0;
-const FallbackModeBasic: Int = 0x1;
-const FallbackModeExt: Int = 0x2;
+const FallbackModeBitNonHttp: Int = 0x1;    // Fallback URI is enabled for non-HTTP protocols
+const FallbackModeBitUrlQuery: Int = 0x2;   // Pass original URL to "q" query parameter
+const FallbackModeBitEnvelopUri: Int = 0x4; // Always use fallback URI for "uri" field, even if None
 
-const VoteStatusError: Int = 0;
-const VoteStatusPending: Int = 1;
-const VoteStatusExecuted: Int = 2;
-const VoteStatusAborted: Int = 3;
-
-// Vote-required Messages: Wallet -> AuthItem -> PetCollection
-const VoteOpMintAuthItem: Int = 0x3ef428b9;
-const VoteOpUpdateSettings: Int = 0x4219f222;
-const VoteOpTransferAuthItem: Int = 0x9d9f8663;
 
 fun speciesToName(species: Int): String {
     if (species == 1) {
@@ -73,7 +64,7 @@ message(0x4219f222) UpdateSettings {
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
-    fbMode: Int as uint2;
+    fbMode: Int as uint3;
     fbUri: String?;
 }
 
