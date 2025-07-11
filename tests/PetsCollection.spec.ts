@@ -212,6 +212,7 @@ describe('PetsCollection Methods', () => {
     let deployResult: SendMessageResult;
     let anyUser: SandboxContract<TreasuryContract>;
     let nftUser: SandboxContract<TreasuryContract>;
+    let minterUser: SandboxContract<TreasuryContract>;
     let addrNames: {[name: string]: Address};
 
 
@@ -276,6 +277,7 @@ describe('PetsCollection Methods', () => {
 
         nftUser = await blockchain.treasury('NFT User');
         anyUser = await blockchain.treasury('Any User');
+        minterUser = await blockchain.treasury('Minter User');
 
         addrNames = {
             'Deployer': deployer.address,
@@ -298,7 +300,9 @@ describe('PetsCollection Methods', () => {
             balanceClassB: 0n,
             fbMode: 5n,
             fbUri: "https://s.petsmem.site/c/",
+            minter: info.minter,
         });
+        expect(info.minter).toEqualAddress(deployer.address);
     });
 
     it('<Get>: get_collection_data()', async () => {
@@ -354,6 +358,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: 'https://s.petsmem.ru/c/',
+                minter: null,
             }
         )
 
@@ -381,7 +386,9 @@ describe('PetsCollection Methods', () => {
             balanceClassB: 0n,
             fbMode: 0n,
             fbUri: "https://s.petsmem.ru/c/",
+            minter: info.minter,
         });
+        expect(info.minter).toEqualAddress(deployer.address);
 
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
@@ -405,6 +412,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_Unauthorized = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -428,6 +436,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_ErrorValidation = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -453,6 +462,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_InsufficientFunds = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -836,6 +846,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
 
@@ -899,6 +910,51 @@ describe('PetsCollection Methods', () => {
         if (nftItem) {
             const contract = await blockchain.getContract(nftItem.address);
             resultReport.flows.MintPetMemoryNft3rdParty.nftBalance = contract.balance;
+            expect(contract.balance).toBe(toNano("0.05"));
+
+            const nftData2 = await nftItem.getGetNftData();
+            expect(nftData2.isInitialized).toBe(true);
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
+            const content = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime);
+        }
+    });
+
+    it('MintPetMemoryNft: shloud mint NFT for 3rd party user by Minter', async () => {
+        const expectedDueTime = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
+        const updateSettings = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'UpdateSettings',
+                feeStorage: 0x3Cn,
+                feeClassA: 0x3An,
+                feeClassB: 0x3Cn,
+                fbMode: 5n,
+                fbUri: null,
+                minter: minterUser.address,
+            }
+        )
+
+        const { mintNftResult, nftItem } = await mintNft(0n, 0n, minterUser);
+
+        resultReport.details.MintPetMemoryNft3rdPartyByMinter = transactionReport(mintNftResult.transactions, PetsCollection.opcodes,
+            {...addrNames, NftItem: nftItem?.address});
+
+        resultReport.flows.MintPetMemoryNft3rdPartyByMinter = transactionAmountFlow(mintNftResult.transactions);
+
+        expect(mintNftResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address},
+            {from: petsCollection.address, deploy: true},
+        ]);
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const contract = await blockchain.getContract(nftItem.address);
+            resultReport.flows.MintPetMemoryNft3rdPartyByMinter.nftBalance = contract.balance;
             expect(contract.balance).toBe(toNano("0.05"));
 
             const nftData2 = await nftItem.getGetNftData();
@@ -1621,6 +1677,7 @@ describe('PetMemoryNft Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
 

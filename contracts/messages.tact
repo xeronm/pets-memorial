@@ -66,6 +66,7 @@ message(0x4219f222) UpdateSettings {
     feeClassB: Int as uint8;
     fbMode: Int as uint3;
     fbUri: String?;
+    minter: Address?;
 }
 
 message(0xa77a7982) Withdraw {
