@@ -32,10 +32,10 @@
         },
         "CollectionWithdrawAndForward": {
             "amount": "0.0048632",
-            "extTotalFees": "0.001753998",
+            "extTotalFees": "0.001753997",
             "outValue": "0.25",
             "inValue": "0.2451368",
-            "totalFees": "0.006703326"
+            "totalFees": "0.006703325"
         },
         "CollectionWithdrawClassB": {
             "amount": "-0.0212348",
@@ -121,11 +121,11 @@
             "totalFees": "0.069201821"
         },
         "PetMemoryNftDestroy": {
-            "amount": "-0.0429016",
+            "amount": "-0.042901599",
             "extTotalFees": "0.001573731",
             "outValue": "0.25",
-            "inValue": "0.2929016",
-            "totalFees": "0.008529062",
+            "inValue": "0.292901599",
+            "totalFees": "0.008529063",
             "nftBalance": "0.05"
         },
         "PetMemoryNftEditContent": {
@@ -573,10 +573,10 @@
                 "value": "0",
                 "outActions": 1,
                 "outValue": "0.25",
-                "totalFees": "0.001753998",
+                "totalFees": "0.001753997",
                 "totalFwdFees": "0.0005748",
                 "computeFee": "0.0007748",
-                "storageFees": "0.000000001",
+                "storageFees": "0",
                 "exitCode": 0,
                 "outMessages": [
                     {
@@ -594,7 +594,7 @@
                 "to": "Collection",
                 "value": "0.25",
                 "outActions": 2,
-                "outValue": "0.342866798",
+                "outValue": "0.3428668",
                 "totalFees": "0.004702128",
                 "totalFwdFees": "0.0009208",
                 "computeFee": "0.0043952",
@@ -619,7 +619,7 @@
                 "op": "WithdrawForward",
                 "from": "Collection",
                 "to": "AnyUser",
-                "value": "0.097729998",
+                "value": "0.09773",
                 "outActions": 0,
                 "outValue": "0",
                 "totalFees": "0.0001236",
@@ -2009,11 +2009,11 @@
                 "to": "NftItem",
                 "value": "0.25",
                 "outActions": 1,
-                "outValue": "0.2929016",
-                "totalFees": "0.006831731",
+                "outValue": "0.292901599",
+                "totalFees": "0.006831732",
                 "totalFwdFees": "0.0004",
                 "computeFee": "0.0066984",
-                "storageFees": "0",
+                "storageFees": "0.000000001",
                 "exitCode": 0,
                 "outMessages": [
                     {
@@ -2025,7 +2025,7 @@
             {
                 "from": "NftItem",
                 "to": "NftOwner",
-                "value": "0.2929016",
+                "value": "0.292901599",
                 "outActions": 0,
                 "outValue": "0",
                 "totalFees": "0.0001236",
