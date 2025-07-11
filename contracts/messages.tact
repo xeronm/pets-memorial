@@ -1,4 +1,4 @@
-const MintPetMemoryNftGasFeeMin: Int = ton("0.014");
+const MintPetMemoryNftGasFeeMin: Int = ton("0.0141");
 const MintPetMemoryNftFwdFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasAndFwdFeeMin: Int = MintPetMemoryNftFwdFeeMin + PetMemoryNftTransferGasFeeMin;
@@ -66,6 +66,7 @@ message(0x4219f222) UpdateSettings {
     feeClassB: Int as uint8;
     fbMode: Int as uint3;
     fbUri: String?;
+    minter: Address?;
 }
 
 message(0xa77a7982) Withdraw {

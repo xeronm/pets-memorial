@@ -4,6 +4,7 @@ import "./pet_memory_nft.tact";
 import "./utils.tact";
 
 struct Info {
+    minter: Address;
     feeStorageTons: Int as coins;
     feeClassATons: Int as coins;
     feeClassBTons: Int as coins;
@@ -73,6 +74,7 @@ contract PetsCollection {
     override const storageReserve: Int = ton("0.05");  // CollectionStorageReserve;
 
     owner: Address;
+    minter: Address;
     // Mutable Internal Attributes
     // - Minting data
     nftIndexSeq: Int as uint40 = 0;
@@ -91,6 +93,7 @@ contract PetsCollection {
 
     init(owner: Address) {
         self.owner = owner;
+        self.minter = owner;
     }
 
     receive() {
@@ -101,25 +104,28 @@ contract PetsCollection {
     }
 
     receive(msg: MintPetMemoryNft) {
-        let storageReserve: Int = unpackQint(self.feeStorage);
-        let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
-        let feeClassB: Int = unpackQint(self.feeClassB);
-        let feeDueTime: Int = SecondsInYear;
-        if (msg.feeClassB > self.feeClassB && feeClassB > 0) {
-            let _feeClassB = unpackQint(msg.feeClassB);
-            feeDueTime = (_feeClassB * SecondsInYear) / feeClassB;
-            feeClassB = _feeClassB;
-        }
         let ctx = context();
-        let fwdFee: Int = ctx.readForwardFee(); // we use fwdFee to estimate deploy message fee
+        let feeDueTime: Int = SecondsInYear;
+        let remainingValue = ctx.value - MintPetMemoryNftGasFeeMin;
+        if (self.minter != sender()) {
+            let storageReserve: Int = unpackQint(self.feeStorage);
+            let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
+            let feeClassB: Int = unpackQint(self.feeClassB);
+            if (msg.feeClassB > self.feeClassB && feeClassB > 0) {
+                let _feeClassB = unpackQint(msg.feeClassB);
+                feeDueTime = (_feeClassB * SecondsInYear) / feeClassB;
+                feeClassB = _feeClassB;
+            }
+            let fwdFee: Int = ctx.readForwardFee(); // we use fwdFee to estimate deploy message fee
 
-        let remainingValue = ctx.value - (feeClassA + feeClassB + MintPetMemoryNftGasFeeMin);
-        // All fees (storage, compute, forward) are deducted from main, Class A balance.
-        throwUnless(ErrorInsufficientFunds, remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasAndFwdFeeMin);
+            remainingValue -= feeClassA + feeClassB;
+            // All fees (storage, compute, forward) are deducted from main, Class A balance.
+            throwUnless(ErrorInsufficientFunds, remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasAndFwdFeeMin);
+            self.balanceClassB += feeClassB;
+        }
 
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), self.nftIndexSeq);
         self.nftIndexSeq += 1;
-        self.balanceClassB += feeClassB;
 
         deploy(DeployParameters{
             value: remainingValue,
@@ -213,6 +219,9 @@ contract PetsCollection {
         self.fbMode = msg.fbMode;
         if (msg.fbUri != null) {
             self.fbUri = msg.fbUri!!;
+        }
+        if (msg.minter != null) {
+            self.minter = msg.minter!!;
         }
         cashback(sender());
     }
@@ -317,6 +326,7 @@ contract PetsCollection {
             //
             fbMode: self.fbMode,
             fbUri: self.fbUri,
+            minter: self.minter,
         }
     }
 
