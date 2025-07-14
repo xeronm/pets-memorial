@@ -24,7 +24,7 @@ const description =
   "He came into our lives on August 19, 2023. We first noticed him a week earlier on our way to the gym — a large gray cat, as thin as a skeleton, emerging from an abandoned house. He looked at people with piercing emerald eyes and cried out loudly.\n"+
   "We tried to feed him, but that day I realized: if he didn’t show up again, I wouldn’t be able to forgive myself. Just an hour later, my wife and I managed to catch him.\n"+
   "He turned out to be a former house cat, neutered, about 10–12 years old, suffering from chronic kidney disease.\n"+
-  "What followed were 15 months of struggle and joy, ups and downs, and countless vet visits. Several times we thought he wouldn’t make it — but he had an iron will to live."+
+  "What followed were 15 months of struggle and joy, ups and downs, and countless vet visits. Several times we thought he wouldn’t make it — but he had an iron will to live. "+
   "He accepted us completely and was incredibly human-oriented — endlessly headbutting, climbing into our arms, and curling up to be petted with his head pressed gently into an elbow.\n"+
   "On November 15, 2024, he passed away."
 
