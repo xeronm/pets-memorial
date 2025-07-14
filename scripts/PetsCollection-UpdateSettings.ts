@@ -9,6 +9,7 @@ const NewSettings: UpdateSettings = {
     feeClassB: 0x3An,
     fbMode: 1n,
     fbUri: null,
+    minter: null,
 }
 
 

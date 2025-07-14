@@ -9,37 +9,39 @@ import { PetMemoryNft } from '../wrappers/PetMemoryNft';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 const fs = require('node:fs');
 
+const oldDescription =
+  "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
+  "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
+  " out of an abandoned private house, looked at people with piercing emerald eyes," +
+  " and screamed. We tried to feed him, but that day I realized that if he did not" +
+  " run out at some day, I would not be able to forgive myself. An hour later, my" +
+  " wife and I caught him.\nIt was a former domestic, neutered cat, 10-12 years old," +
+  " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
+  " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
+  " but he had an iron will to live. However, on 11/15/2024, he passed away."
+
+const description =
+  "He came into our lives on August 19, 2023. We first noticed him a week earlier on our way to the gym — a large gray cat, as thin as a skeleton, emerging from an abandoned house. He looked at people with piercing emerald eyes and cried out loudly.\n"+
+  "We tried to feed him, but that day I realized: if he didn’t show up again, I wouldn’t be able to forgive myself. Just an hour later, my wife and I managed to catch him.\n"+
+  "He turned out to be a former house cat, neutered, about 10–12 years old, suffering from chronic kidney disease.\n"+
+  "What followed were 15 months of struggle and joy, ups and downs, and countless vet visits. Several times we thought he wouldn’t make it — but he had an iron will to live."+
+  "He accepted us completely and was incredibly human-oriented — endlessly headbutting, climbing into our arms, and curling up to be petted with his head pressed gently into an elbow.\n"+
+  "On November 15, 2024, he passed away."
 
 const nftDataImageOnChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
   image: null,
   imageData: toTextCellSnake(fs.readFileSync('./assets/images/marcus-2-onchain-256x256.jpg')),
-  description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
-              "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
-              " out of an abandoned private house, looked at people with piercing emerald eyes," +
-              " and screamed. We tried to feed him, but that day I realized that if he did not" +
-              " run out at some day, I would not be able to forgive myself. An hour later, my" +
-              " wife and I caught him.\nIt was a former domestic, neutered cat, 10-12 years old," +
-              " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
-              " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
-              " but he had an iron will to live. However, on 11/15/2024, he passed away."
+  description: description
 }
 
 const nftDataImageOffChain: NftMutableMetaData = {
   $$type: 'NftMutableMetaData',
   uri: null,
-  image: 'ipfs://bafybeib356rlhshb7uxlxgwkk4qh4kyrm2ewp4n5qm2yxu4z2yjghevism/marcus-1.webp',
+  image: 'ipfs://bafybeib356rlhshb7uxlxgwkk4qh4kyrm2ewp4n5qm2yxu4z2yjghevism/marcus-4.webp',
   imageData: null,
-  description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
-              "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
-              " out of an abandoned private house, looked at people with piercing emerald eyes," +
-              " and screamed. We tried to feed him, but that day I realized that if he did not" +
-              " run out at some day, I would not be able to forgive myself. An hour later, my" +
-              " wife and I caught him.\nIt was a former domestic, neutered cat, 10-12 years old," +
-              " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
-              " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
-              " but he had an iron will to live. However, on 11/15/2024, he passed away."
+  description: description
 }
 
 const nftDataImageOffChain2: NftMutableMetaData = {
@@ -47,15 +49,7 @@ const nftDataImageOffChain2: NftMutableMetaData = {
   uri: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/meta.json',
   image: 'https://s.getgems.io/nft/c/6738e6330102dc6fdeba9f27/1000000/image.png',
   imageData: null,
-  description: "He appeared in our lives on 08/19/2023. We noticed him a week earlier, " +
-              "on the way to the gym. A big, gray cat, thin as a skeleton, was running" +
-              " out of an abandoned private house, looked at people with piercing emerald eyes," +
-              " and screamed. We tried to feed him, but that day I realized that if he did not" +
-              " run out at some day, I would not be able to forgive myself. An hour later, my" +
-              " wife and I caught him.\nIt was a former domestic, neutered cat, 10-12 years old," +
-              " with CKD. Then there were 15 months of struggle and joy of life, ups and downs," +
-              " and dozens of visits to vets. Several times we thought that he wouldn't get out," +
-              " but he had an iron will to live. However, on 11/15/2024, he passed away."
+  description: description
 }
 
 const nftDataImageOffChain3: NftMutableMetaData = {

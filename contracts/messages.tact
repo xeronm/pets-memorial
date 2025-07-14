@@ -23,13 +23,34 @@ fun speciesToName(species: Int): String {
     else if (species == 2) {
         return "Cat"
     }
+    else if (species == 3) {
+        return "Hamster/Guinea Pig"
+    }
+    else if (species == 4) {
+        return "Rabbit"
+    }
+    else if (species == 5) {
+        return "Parrot"
+    }
+    else if (species == 6) {
+        return "Fish"
+    }
+    else if (species == 7) {
+        return "Turtle"
+    }
+    else if (species == 8) {
+        return "Reptile"
+    }
+    else if (species == 9) {
+        return "Horse/Pony"
+    }
     return "";
 }
 
 
 // Common Structures
 struct PetMemoryNftImmutableData {
-    species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3... - reserved;
+    species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3 - Hamster / Guinea Pig, 4 - Rabbit, 5 - Parrot, 6 - Fish, 7 - Turtle, 8 - Reptile, 9 - Horse / Pony, 10... - reserved;
     name: String;
     sex: Int as uint1; // 0 - male, 1 - female
     speciesName: String?;
