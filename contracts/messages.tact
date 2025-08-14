@@ -44,6 +44,12 @@ fun speciesToName(species: Int): String {
     else if (species == 9) {
         return "Horse/Pony"
     }
+    else if (species == 10) {
+        return "Hedgehog"
+    }
+    else if (species == 11) {
+        return "Mouse/Rat"
+    }
     return "";
 }
 
