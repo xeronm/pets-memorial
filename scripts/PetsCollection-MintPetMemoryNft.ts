@@ -63,8 +63,8 @@ const nftDataImageOffChain3: NftMutableMetaData = {
 }
 
 // const nftData = nftDataImageOnChain;
-const nftData = nftDataImageOffChain;
-// const nftData = nftDataImageOffChain2;
+// const nftData = nftDataImageOffChain;
+const nftData = nftDataImageOffChain2;
 // const nftData = nftDataImageOffChain3;
 
 const nftImmDataMarcusCat: PetMemoryNftImmutableData = {

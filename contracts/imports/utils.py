@@ -11,7 +11,7 @@ def unpack_qint(qnum: int) -> int:
     return (num * pow(10, qnum >> 3)) >> 3
 
 
-for x in range(17):
+for x in range(25):
     x = (0b11 << 4) + x
     r = round(unpack_qint(x)/1e9, 5)
     print(f';; 0x{x:X} -> {(x >> 3):05b} {(x & 7):03b} -> {r:0.5f} TON')

@@ -4,12 +4,12 @@ import { NetworkProvider, sleep } from '@ton/blueprint';
 
 const NewSettings: UpdateSettings = {
     $$type: 'UpdateSettings',
-    feeStorage: 0x3Cn,
-    feeClassA: 0x3An,
-    feeClassB: 0x3An,
-    fbMode: 1n,
+    feeStorage: 0x3Cn, // 0.05 TON
+    feeClassA: 0x48n,  // 1 TON
+    feeClassB: 0x44n,  // 0.5 TON
+    fbMode: 5n,
     fbUri: null,
-    minter: null,
+    minter: Address.parse('0QBdDAYMeJLygjji1bFPRUY4yWP3_3JlNIllIG5SSNJEgCrH'),
 }
 
 

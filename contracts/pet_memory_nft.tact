@@ -83,6 +83,9 @@ contract PetMemoryNft {
                 });
             }
         }
+        else {
+            cashback(sender());
+        }
     }
 
     receive(msg: GetStaticData) {
@@ -113,7 +116,7 @@ contract PetMemoryNft {
             to: sender(),
             bounce: false,
             value: 0,
-            mode: SendRemainingBalance + SendDestroyIfZero,
+            mode: SendRemainingBalance,
             body: null
         });
     }
@@ -123,7 +126,7 @@ contract PetMemoryNft {
             isInitialized: self.owner != null,
             index: self.index,
             collectionAddress: self.collectionAddress,
-            ownerAddress: self.owner!!,
+            ownerAddress: self.owner != null ? self.owner!! : newAddress(0, 0),
             individualContent: PetMemoryNftContent{
                 immData: self.immData!!,
                 data: self.data!!,

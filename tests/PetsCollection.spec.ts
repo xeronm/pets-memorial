@@ -28,6 +28,8 @@ const ExitCodes = {
 };
 
 
+const AddrNone = new Address(0, Buffer.alloc(32, 0));
+
 const MinTransactionAmount = toNano('0.004'); // Deposit `totalFees`
 const MaxTransactionAmount = toNano('0.25');  // Mint Big NFT
 const MaxBalanceDifference = toNano('0.01');
@@ -310,7 +312,7 @@ describe('PetsCollection Methods', () => {
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
-            name: 'Test Collection',
+            name: 'Pets Memorial',
             uri: `https://s.petsmem.site/c/${petsCollection.address}?q=uri`,
             image: `https://s.petsmem.site/c/${petsCollection.address}?q=image`
         });
@@ -393,7 +395,7 @@ describe('PetsCollection Methods', () => {
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
-            name: "Test Collection",
+            name: "Pets Memorial",
             uri: `https://s.petsmem.ru/c/${petsCollection.address}?q=uri`,
             image: `https://s.petsmem.ru/c/${petsCollection.address}?q=image`
         });
@@ -1289,7 +1291,10 @@ describe('PetMemoryNft Methods', () => {
             ]);
 
             expect(contract.balance).toBe(0n);
-            expect(contract.accountState).toBeUndefined();
+            expect(contract.accountState?.type).toBe("active");
+
+            const nftData1 = await nftItem.getGetNftData();
+            expect(nftData1.ownerAddress).toEqualAddress(AddrNone);
         }
     });
 
@@ -1320,6 +1325,32 @@ describe('PetMemoryNft Methods', () => {
         }
     });
 
+    it('GetStaticData: shloud response', async () => {
+        const { nftItem } = await mintNft();
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const getStaticDataResult = await nftItem.send(
+                nftUser.getSender(),
+                {
+                    value: MaxTransactionAmount,
+                },
+                {
+                    $$type: 'GetStaticData',
+                    queryId: 1234n,
+                }
+            );
+
+            resultReport.details.PetMemoryNftGetStaticData = transactionReport(getStaticDataResult.transactions, PetsCollection.opcodes,
+                {...addrNames, NftItem: nftItem.address});
+
+            expect(getStaticDataResult.transactions).toHaveTransactionSeq([
+                {},
+                {from: nftUser.address, to: nftItem.address},
+                {from: nftItem.address, to: nftUser.address},
+            ]);
+
+        }
+    });
 
     it('<Get>: get_nft_address_by_index()', async () => {
         const { nftItem } = await mintNft();

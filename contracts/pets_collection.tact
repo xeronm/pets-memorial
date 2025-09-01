@@ -1,5 +1,6 @@
 import "./imports/utils.fc";
 import "./messages.tact";
+import "./exceptions.tact";
 import "./pet_memory_nft.tact";
 import "./utils.tact";
 
@@ -17,9 +18,6 @@ struct Info {
     fbUri: String;
 }
 
-const MaxAuthItemIndex: Int = 15;
-const MinVoteDurationHours: Int = 24;
-
 const FieldUri: Int = sha256("uri");
 const FieldName: Int = sha256("name");
 const FieldDescription: Int = sha256("description");
@@ -29,7 +27,7 @@ const FieldAttributes: Int = sha256("attributes");
 const FieldTraitType: Int = sha256("trait_type");
 const FieldValue: Int = sha256("value");
 
-const PetsCollectionName: String = "Test Collection";
+const PetsCollectionName: String = "Pets Memorial";
 
 const ContentTypeImage: String = "image";
 const ContentTypeUri: String = "uri";

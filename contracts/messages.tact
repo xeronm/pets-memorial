@@ -50,6 +50,9 @@ fun speciesToName(species: Int): String {
     else if (species == 11) {
         return "Mouse/Rat"
     }
+    else if (species == 12) {
+        return "Ferret"
+    }
     return "";
 }
 
