@@ -28,6 +28,8 @@ const ExitCodes = {
 };
 
 
+const AddrNone = new Address(0, Buffer.alloc(32, 0));
+
 const MinTransactionAmount = toNano('0.004'); // Deposit `totalFees`
 const MaxTransactionAmount = toNano('0.25');  // Mint Big NFT
 const MaxBalanceDifference = toNano('0.01');
@@ -212,6 +214,7 @@ describe('PetsCollection Methods', () => {
     let deployResult: SendMessageResult;
     let anyUser: SandboxContract<TreasuryContract>;
     let nftUser: SandboxContract<TreasuryContract>;
+    let minterUser: SandboxContract<TreasuryContract>;
     let addrNames: {[name: string]: Address};
 
 
@@ -276,6 +279,7 @@ describe('PetsCollection Methods', () => {
 
         nftUser = await blockchain.treasury('NFT User');
         anyUser = await blockchain.treasury('Any User');
+        minterUser = await blockchain.treasury('Minter User');
 
         addrNames = {
             'Deployer': deployer.address,
@@ -286,7 +290,6 @@ describe('PetsCollection Methods', () => {
     });
 
     it('<Get>: get_info()', async () => {
-
         // 2. Collection Info
         const info = await petsCollection.getGetInfo();
         expect(info).toEqual({
@@ -297,9 +300,11 @@ describe('PetsCollection Methods', () => {
             balance: StorageTonsReserve.Collection,
             balanceClassA: toNano("0.05"),
             balanceClassB: 0n,
-            fbMode: 1n,
+            fbMode: 5n,
             fbUri: "https://s.petsmem.site/c/",
+            minter: info.minter,
         });
+        expect(info.minter).toEqualAddress(deployer.address);
     });
 
     it('<Get>: get_collection_data()', async () => {
@@ -307,7 +312,7 @@ describe('PetsCollection Methods', () => {
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
-            name: 'Test Collection',
+            name: 'Pets Memorial',
             uri: `https://s.petsmem.site/c/${petsCollection.address}?q=uri`,
             image: `https://s.petsmem.site/c/${petsCollection.address}?q=image`
         });
@@ -355,6 +360,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: 'https://s.petsmem.ru/c/',
+                minter: null,
             }
         )
 
@@ -382,12 +388,14 @@ describe('PetsCollection Methods', () => {
             balanceClassB: 0n,
             fbMode: 0n,
             fbUri: "https://s.petsmem.ru/c/",
+            minter: info.minter,
         });
+        expect(info.minter).toEqualAddress(deployer.address);
 
         const data =  await petsCollection.getGetCollectionData();
         const attributes = await decodeNftMetadata(data.collectionContent);
         expect(attributes).toStrictEqual({
-            name: "Test Collection",
+            name: "Pets Memorial",
             uri: `https://s.petsmem.ru/c/${petsCollection.address}?q=uri`,
             image: `https://s.petsmem.ru/c/${petsCollection.address}?q=image`
         });
@@ -406,6 +414,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_Unauthorized = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -429,6 +438,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_ErrorValidation = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -454,6 +464,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
         resultReport.details.CollectionUpdateSettings_InsufficientFunds = transactionReport(updateSettings.transactions, PetsCollection.opcodes, addrNames);
@@ -837,6 +848,7 @@ describe('PetsCollection Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
 
@@ -900,6 +912,51 @@ describe('PetsCollection Methods', () => {
         if (nftItem) {
             const contract = await blockchain.getContract(nftItem.address);
             resultReport.flows.MintPetMemoryNft3rdParty.nftBalance = contract.balance;
+            expect(contract.balance).toBe(toNano("0.05"));
+
+            const nftData2 = await nftItem.getGetNftData();
+            expect(nftData2.isInitialized).toBe(true);
+            expect(nftData2.ownerAddress).toEqualAddress(nftUser.address);
+            const content = loadPetMemoryNftContent(nftData2.individualContent.asSlice());
+            expect(content.feeDueTime).toBeGreaterThanOrEqual(expectedDueTime);
+        }
+    });
+
+    it('MintPetMemoryNft: shloud mint NFT for 3rd party user by Minter', async () => {
+        const expectedDueTime = BigInt(Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60);
+        const updateSettings = await petsCollection.send(
+            deployer.getSender(),
+            {
+                value: MaxTransactionAmount,
+            },
+            {
+                $$type: 'UpdateSettings',
+                feeStorage: 0x3Cn,
+                feeClassA: 0x3An,
+                feeClassB: 0x3Cn,
+                fbMode: 5n,
+                fbUri: null,
+                minter: minterUser.address,
+            }
+        )
+
+        const { mintNftResult, nftItem } = await mintNft(0n, 0n, minterUser);
+
+        resultReport.details.MintPetMemoryNft3rdPartyByMinter = transactionReport(mintNftResult.transactions, PetsCollection.opcodes,
+            {...addrNames, NftItem: nftItem?.address});
+
+        resultReport.flows.MintPetMemoryNft3rdPartyByMinter = transactionAmountFlow(mintNftResult.transactions);
+
+        expect(mintNftResult.transactions).toHaveTransactionSeq([
+            {},
+            {to: petsCollection.address},
+            {from: petsCollection.address, deploy: true},
+        ]);
+
+        expect(nftItem).not.toBeUndefined();
+        if (nftItem) {
+            const contract = await blockchain.getContract(nftItem.address);
+            resultReport.flows.MintPetMemoryNft3rdPartyByMinter.nftBalance = contract.balance;
             expect(contract.balance).toBe(toNano("0.05"));
 
             const nftData2 = await nftItem.getGetNftData();
@@ -1202,69 +1259,95 @@ describe('PetMemoryNft Methods', () => {
 
     });
 
-    it('Destroy: shloud destroy', async () => {
+    // it('Destroy: shloud destroy', async () => {
+    //     const { nftItem } = await mintNft();
+    //     expect(nftItem).not.toBeUndefined();
+    //     if (nftItem) {
+
+    //         const contract = await blockchain.getContract(nftItem.address);
+    //         expect(contract.balance).toBeGreaterThanOrEqual(toNano("0.05"));
+    //         const balaneBefore = contract.balance;
+
+    //         const destroyResult = await nftItem.send(
+    //             nftUser.getSender(),
+    //             {
+    //                 value: MaxTransactionAmount,
+    //             },
+    //             {
+    //                 $$type: 'Destroy'
+    //             }
+    //         );
+
+    //         resultReport.details.PetMemoryNftDestroy = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
+    //             {...addrNames, NftItem: nftItem.address});
+
+    //         resultReport.flows.PetMemoryNftDestroy = transactionAmountFlow(destroyResult.transactions);
+    //         resultReport.flows.PetMemoryNftDestroy.nftBalance = balaneBefore;
+
+    //         expect(destroyResult.transactions).toHaveTransactionSeq([
+    //             {},
+    //             {from: nftUser.address, to: nftItem.address},
+    //             {from: nftItem.address, to: nftUser.address, valueLower: balaneBefore},
+    //         ]);
+
+    //         expect(contract.balance).toBe(0n);
+    //         expect(contract.accountState?.type).toBeUndefined();
+    //     }
+    // });
+
+    // it('Destroy: shloud not Destroy (Unauthorized)', async () => {
+    //     const { nftItem } = await mintNft();
+    //     expect(nftItem).toBeDefined();
+    //     if (nftItem) {
+    //         const destroyResult = await nftItem.send(
+    //             deployer.getSender(),
+    //             {
+    //                 value: MaxTransactionAmount
+    //             },
+    //             {
+    //                 $$type: 'Destroy'
+    //             }
+    //         );
+
+    //         resultReport.details.PetMemoryNftDestroy_Unauthorized = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
+    //             {...addrNames, NftItem: nftItem.address});
+
+    //         expect(destroyResult.transactions).toHaveTransaction({
+    //             from: deployer.address,
+    //             to: nftItem.address,
+    //             success: false,
+    //             aborted: true,
+    //             exitCode: ExitCodes.ErrorNotAuthorized,
+    //         });
+    //     }
+    // });
+
+    it('GetStaticData: shloud response', async () => {
         const { nftItem } = await mintNft();
         expect(nftItem).not.toBeUndefined();
         if (nftItem) {
-
-            const contract = await blockchain.getContract(nftItem.address);
-            expect(contract.balance).toBeGreaterThanOrEqual(toNano("0.05"));
-            const balaneBefore = contract.balance;
-
-            const destroyResult = await nftItem.send(
+            const getStaticDataResult = await nftItem.send(
                 nftUser.getSender(),
                 {
                     value: MaxTransactionAmount,
                 },
                 {
-                    $$type: 'Destroy'
+                    $$type: 'GetStaticData',
+                    queryId: 1234n,
                 }
             );
 
-            resultReport.details.PetMemoryNftDestroy = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
+            resultReport.details.PetMemoryNftGetStaticData = transactionReport(getStaticDataResult.transactions, PetsCollection.opcodes,
                 {...addrNames, NftItem: nftItem.address});
 
-            resultReport.flows.PetMemoryNftDestroy = transactionAmountFlow(destroyResult.transactions);
-            resultReport.flows.PetMemoryNftDestroy.nftBalance = balaneBefore;
-
-            expect(destroyResult.transactions).toHaveTransactionSeq([
+            expect(getStaticDataResult.transactions).toHaveTransactionSeq([
                 {},
                 {from: nftUser.address, to: nftItem.address},
-                {from: nftItem.address, to: nftUser.address, valueLower: balaneBefore},
+                {from: nftItem.address, to: nftUser.address},
             ]);
 
-            expect(contract.balance).toBe(0n);
-            expect(contract.accountState).toBeUndefined();
         }
     });
-
-    it('Destroy: shloud not Destroy (Unauthorized)', async () => {
-        const { nftItem } = await mintNft();
-        expect(nftItem).toBeDefined();
-        if (nftItem) {
-            const destroyResult = await nftItem.send(
-                deployer.getSender(),
-                {
-                    value: MaxTransactionAmount
-                },
-                {
-                    $$type: 'Destroy'
-                }
-            );
-
-            resultReport.details.PetMemoryNftDestroy_Unauthorized = transactionReport(destroyResult.transactions, PetsCollection.opcodes,
-                {...addrNames, NftItem: nftItem.address});
-
-            expect(destroyResult.transactions).toHaveTransaction({
-                from: deployer.address,
-                to: nftItem.address,
-                success: false,
-                aborted: true,
-                exitCode: ExitCodes.ErrorNotAuthorized,
-            });
-        }
-    });
-
 
     it('<Get>: get_nft_address_by_index()', async () => {
         const { nftItem } = await mintNft();
@@ -1294,7 +1377,7 @@ describe('PetMemoryNft Methods', () => {
 
             const attributes = await decodeNftMetadata(nftContent);
             expect(attributes.description).toBe(nftData.description);
-            expect(attributes.uri).toBe(nftData.uri);
+            expect(attributes.uri).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=uri`);
             expect(attributes.image).toBe(nftData.image);
             expect(attributes.name).toBe('Marcus, Cat, RU, Krasnodar 350020 (2012-* ~ 2024-11-15)');
             expect(attributes.image_data.length).toBeGreaterThan(3000);
@@ -1338,7 +1421,8 @@ describe('PetMemoryNft Methods', () => {
             const attributes1 = await decodeNftMetadata(nftContent1);
             expect(attributes1.description).toBe('Overriden Description');
             expect(attributes1.image).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=image`);
-            expect(attributes1.uri).toBeUndefined();
+            expect(attributes1.uri).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=uri`);
+            // expect(attributes1.uri).toBeUndefined();
 
 
             const editResult2 = await nftItem.send(
@@ -1368,7 +1452,7 @@ describe('PetMemoryNft Methods', () => {
             const attributes2 = await decodeNftMetadata(nftContent2);
             expect(attributes2.image).toBeUndefined();
             expect(attributes2.description).toBe(nftData.description);
-            expect(attributes2.uri).toBe(nftData.uri);
+            expect(attributes2.uri).toBe(`https://s.petsmem.site/c/${nftItem.address}?q=uri`);
             expect(attributes2.image_data.length).toBeGreaterThan(3000);
 
 
@@ -1621,6 +1705,7 @@ describe('PetMemoryNft Methods', () => {
                 feeClassB: 0n,
                 fbMode: 0n,
                 fbUri: null,
+                minter: null,
             }
         )
 

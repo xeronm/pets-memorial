@@ -1,4 +1,4 @@
-const MintPetMemoryNftGasFeeMin: Int = ton("0.014");
+const MintPetMemoryNftGasFeeMin: Int = ton("0.0139");
 const MintPetMemoryNftFwdFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasFeeMin: Int = ton("0.01");
 const PetMemoryNftTransferGasAndFwdFeeMin: Int = MintPetMemoryNftFwdFeeMin + PetMemoryNftTransferGasFeeMin;
@@ -11,19 +11,10 @@ const MaxFeeDueSeconds: Int = 126144000; // SecondsInYear * 4
 
 const MinFeeStorage: Int = 0x38; // 0.01 TON
 
-const FallbackModeNone: Int = 0x0;
-const FallbackModeBasic: Int = 0x1;
-const FallbackModeExt: Int = 0x2;
+const FallbackModeBitNonHttp: Int = 0x1;    // Fallback URI is enabled for non-HTTP protocols
+const FallbackModeBitUrlQuery: Int = 0x2;   // Pass original URL to "q" query parameter
+const FallbackModeBitEnvelopUri: Int = 0x4; // Always use fallback URI for "uri" field, even if None
 
-const VoteStatusError: Int = 0;
-const VoteStatusPending: Int = 1;
-const VoteStatusExecuted: Int = 2;
-const VoteStatusAborted: Int = 3;
-
-// Vote-required Messages: Wallet -> AuthItem -> PetCollection
-const VoteOpMintAuthItem: Int = 0x3ef428b9;
-const VoteOpUpdateSettings: Int = 0x4219f222;
-const VoteOpTransferAuthItem: Int = 0x9d9f8663;
 
 fun speciesToName(species: Int): String {
     if (species == 1) {
@@ -32,13 +23,43 @@ fun speciesToName(species: Int): String {
     else if (species == 2) {
         return "Cat"
     }
+    else if (species == 3) {
+        return "Hamster/Guinea Pig"
+    }
+    else if (species == 4) {
+        return "Rabbit"
+    }
+    else if (species == 5) {
+        return "Parrot"
+    }
+    else if (species == 6) {
+        return "Fish"
+    }
+    else if (species == 7) {
+        return "Turtle"
+    }
+    else if (species == 8) {
+        return "Reptile"
+    }
+    else if (species == 9) {
+        return "Horse/Pony"
+    }
+    else if (species == 10) {
+        return "Hedgehog"
+    }
+    else if (species == 11) {
+        return "Mouse/Rat"
+    }
+    else if (species == 12) {
+        return "Ferret"
+    }
     return "";
 }
 
 
 // Common Structures
 struct PetMemoryNftImmutableData {
-    species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3... - reserved;
+    species: Int as uint4; // 0 - other (see speciesName), 1 - Dog, 2 - Cat, 3 - Hamster / Guinea Pig, 4 - Rabbit, 5 - Parrot, 6 - Fish, 7 - Turtle, 8 - Reptile, 9 - Horse / Pony, 10... - reserved;
     name: String;
     sex: Int as uint1; // 0 - male, 1 - female
     speciesName: String?;
@@ -73,8 +94,9 @@ message(0x4219f222) UpdateSettings {
     feeStorage: Int as uint8;
     feeClassA: Int as uint8;
     feeClassB: Int as uint8;
-    fbMode: Int as uint2;
+    fbMode: Int as uint3;
     fbUri: String?;
+    minter: Address?;
 }
 
 message(0xa77a7982) Withdraw {

@@ -1,9 +1,11 @@
 import "./imports/utils.fc";
 import "./messages.tact";
+import "./exceptions.tact";
 import "./pet_memory_nft.tact";
 import "./utils.tact";
 
 struct Info {
+    minter: Address;
     feeStorageTons: Int as coins;
     feeClassATons: Int as coins;
     feeClassBTons: Int as coins;
@@ -12,20 +14,20 @@ struct Info {
     balanceClassA: Int as coins;
     balanceClassB: Int as coins;
     //
-    fbMode: Int as uint2;
+    fbMode: Int as uint3;
     fbUri: String;
 }
-
-const MaxAuthItemIndex: Int = 15;
-const MinVoteDurationHours: Int = 24;
 
 const FieldUri: Int = sha256("uri");
 const FieldName: Int = sha256("name");
 const FieldDescription: Int = sha256("description");
 const FieldImage: Int = sha256("image");
 const FieldImageData: Int = sha256("image_data");
+const FieldAttributes: Int = sha256("attributes");
+const FieldTraitType: Int = sha256("trait_type");
+const FieldValue: Int = sha256("value");
 
-const PetsCollectionName: String = "Test Collection";
+const PetsCollectionName: String = "Pets Memorial";
 
 const ContentTypeImage: String = "image";
 const ContentTypeUri: String = "uri";
@@ -56,9 +58,9 @@ fun encodeNftMetadataContent(name: String, uri: String?, description: String?, i
 }
 
 fun makeUri(fbUri: String, fbMode: Int, address: String, qtype: String, uri: String?): String {
-    if (uri == null || (fbMode != 0 && uri!!.asSlice().loadUint(32) != ascii("http"))) {
+    if (uri == null || ((fbMode & FallbackModeBitNonHttp) != 0 && uri!!.asSlice().loadUint(32) != ascii("http"))) {
         let newUri = beginString().concat(fbUri).concat(address).concat("?q=").concat(qtype);
-        if (fbMode == FallbackModeExt && uri != null) {
+        if ((fbMode & FallbackModeBitUrlQuery) != 0 && uri != null) {
             newUri = newUri.concat("&u=").concat(uri!!);
         }
         return newUri.toString();
@@ -70,6 +72,7 @@ contract PetsCollection {
     override const storageReserve: Int = ton("0.05");  // CollectionStorageReserve;
 
     owner: Address;
+    minter: Address;
     // Mutable Internal Attributes
     // - Minting data
     nftIndexSeq: Int as uint40 = 0;
@@ -83,11 +86,12 @@ contract PetsCollection {
     feeClassA: Int as uint8 = 0x3A; // 0.025 TON
     feeClassB: Int as uint8 = 0x3C; // 0.05 TON
     //
-    fbMode: Int as uint2 = FallbackModeBasic;
+    fbMode: Int as uint3 = FallbackModeBitNonHttp | FallbackModeBitEnvelopUri;
     fbUri: String = DefaultFallback;
 
     init(owner: Address) {
         self.owner = owner;
+        self.minter = owner;
     }
 
     receive() {
@@ -98,25 +102,28 @@ contract PetsCollection {
     }
 
     receive(msg: MintPetMemoryNft) {
-        let storageReserve: Int = unpackQint(self.feeStorage);
-        let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
-        let feeClassB: Int = unpackQint(self.feeClassB);
-        let feeDueTime: Int = SecondsInYear;
-        if (msg.feeClassB > self.feeClassB && feeClassB > 0) {
-            let _feeClassB = unpackQint(msg.feeClassB);
-            feeDueTime = (_feeClassB * SecondsInYear) / feeClassB;
-            feeClassB = _feeClassB;
-        }
         let ctx = context();
-        let fwdFee: Int = ctx.readForwardFee(); // we use fwdFee to estimate deploy message fee
+        let feeDueTime: Int = SecondsInYear;
+        let remainingValue = ctx.value - MintPetMemoryNftGasFeeMin;
+        if (self.minter != sender()) {
+            let storageReserve: Int = unpackQint(self.feeStorage);
+            let feeClassA: Int = unpackQint(max(msg.feeClassA, self.feeClassA));
+            let feeClassB: Int = unpackQint(self.feeClassB);
+            if (msg.feeClassB > self.feeClassB && feeClassB > 0) {
+                let _feeClassB = unpackQint(msg.feeClassB);
+                feeDueTime = (_feeClassB * SecondsInYear) / feeClassB;
+                feeClassB = _feeClassB;
+            }
+            let fwdFee: Int = ctx.readForwardFee(); // we use fwdFee to estimate deploy message fee
 
-        let remainingValue = ctx.value - (feeClassA + feeClassB + MintPetMemoryNftGasFeeMin);
-        // All fees (storage, compute, forward) are deducted from main, Class A balance.
-        throwUnless(ErrorInsufficientFunds, remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasAndFwdFeeMin);
+            remainingValue -= feeClassA + feeClassB;
+            // All fees (storage, compute, forward) are deducted from main, Class A balance.
+            throwUnless(ErrorInsufficientFunds, remainingValue >= storageReserve + fwdFee + PetMemoryNftTransferGasAndFwdFeeMin);
+            self.balanceClassB += feeClassB;
+        }
 
         let nftInit: StateInit = initOf PetMemoryNft(myAddress(), self.nftIndexSeq);
         self.nftIndexSeq += 1;
-        self.balanceClassB += feeClassB;
 
         deploy(DeployParameters{
             value: remainingValue,
@@ -211,6 +218,9 @@ contract PetsCollection {
         if (msg.fbUri != null) {
             self.fbUri = msg.fbUri!!;
         }
+        if (msg.minter != null) {
+            self.minter = msg.minter!!;
+        }
         cashback(sender());
     }
 
@@ -227,7 +237,7 @@ contract PetsCollection {
             makeUri(self.fbUri, 0, address, ContentTypeUri, null),
             null,
             makeUri(self.fbUri, 0, address, ContentTypeImage, null),
-            null
+            null,
         );
 
         return CollectionData{
@@ -248,17 +258,18 @@ contract PetsCollection {
         let uri: String? = null;
         let image: String? = null;
         let imageData: Cell? = null;
-
         // PetMemoryNFT
         let content: PetMemoryNftContent = PetMemoryNftContent.fromCell(individualContent);
 
+        let speciesName: String = (content.immData.speciesName != null) ? content.immData.speciesName!! : speciesToName(content.immData.species);
         nameStr = nameStr.concat(content.immData.name)
             .concat(", ")
-            .concat((content.immData.speciesName != null) ? content.immData.speciesName!! : speciesToName(content.immData.species));
+            .concat(speciesName);
 
         // TODO: Add serialization depends on serialization mask each bit for each feature
         if (content.immData.countryCode > 0) {
-            nameStr = nameStr.concat(", ").concat(bcd2cToString(content.immData.countryCode));
+            let country: String = bcd2cToString(content.immData.countryCode);
+            nameStr = nameStr.concat(", ").concat(country);
         }
 
         if (content.immData.location != null) {
@@ -266,16 +277,21 @@ contract PetsCollection {
         }
 
         if (content.immData.birthDate > 0 || content.immData.deathDate > 0) {
+            let birth: String = dateMaskToString(content.immData.birthDate);
+            let death: String = dateMaskToString(content.immData.deathDate);
             nameStr = nameStr.concat(" (")
-                .concat(dateMaskToString(content.immData.birthDate))
+                .concat(birth)
                 .concat(" ~ ")
-                .concat(dateMaskToString(content.immData.deathDate))
+                .concat(death)
                 .concat(")");
         }
 
         let address: String = contractAddress(initOf PetMemoryNft(myAddress(), index)).toString();
 
-        if (content.data.uri != null) {
+        if ((self.fbMode & FallbackModeBitEnvelopUri) != 0) {
+            uri = makeUri(self.fbUri, self.fbMode, address, ContentTypeUri, null);
+        }
+        else if (content.data.uri != null) {
             uri = makeUri(self.fbUri, self.fbMode, address, ContentTypeUri, content.data.uri);
         }
         description = content.data.description;
@@ -308,6 +324,7 @@ contract PetsCollection {
             //
             fbMode: self.fbMode,
             fbUri: self.fbUri,
+            minter: self.minter,
         }
     }
 
