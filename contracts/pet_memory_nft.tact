@@ -109,24 +109,24 @@ contract PetMemoryNft {
         cashback(sender());
     }
 
-    receive(msg: Destroy) {
-        throwUnless(ErrorNotAuthorized, sender() == self.owner);
-        self.owner = null;
-        message(MessageParameters{
-            to: sender(),
-            bounce: false,
-            value: 0,
-            mode: SendRemainingBalance,
-            body: null
-        });
-    }
+    // receive(msg: Destroy) {
+    //     throwUnless(ErrorNotAuthorized, sender() == self.owner);
+    //     self.owner = null;
+    //     message(MessageParameters{
+    //         to: sender(),
+    //         bounce: false,
+    //         value: 0,
+    //         mode: SendRemainingBalance + SendDestroyIfZero,
+    //         body: null
+    //     });
+    // }
 
     get fun get_nft_data(): GetNftData {
         return GetNftData {
             isInitialized: self.owner != null,
             index: self.index,
             collectionAddress: self.collectionAddress,
-            ownerAddress: self.owner != null ? self.owner!! : newAddress(0, 0),
+            ownerAddress: self.owner != null ? self.owner!! : self.collectionAddress,
             individualContent: PetMemoryNftContent{
                 immData: self.immData!!,
                 data: self.data!!,

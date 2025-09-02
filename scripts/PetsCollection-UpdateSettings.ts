@@ -37,7 +37,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   let info2 = await petsCollection.getGetInfo();
   let attempt = 1;
-  while (info2 == info1) {
+  while (JSON.stringify(info2) == JSON.stringify(info1)) {
     ui.setActionPrompt(`Attempt ${attempt}`);
     await sleep(3000);
     info2 = await petsCollection.getGetInfo();
