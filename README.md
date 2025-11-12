@@ -8,6 +8,8 @@ Mainnet Website: https://petsmem.site/
 
 Mainnet Contract: [EQBSsYn6y560LVuVf3UYOnKUfH7Fexfk4iXtkA2TPl-CUsa6](https://tonviewer.com/EQBSsYn6y560LVuVf3UYOnKUfH7Fexfk4iXtkA2TPl-CUsa6)
 
+Collection on Getgems: [@petsmem](https://getgems.io/petsmem)
+
 Linked repositories:
 - TON NFT Torrent HTTP Gateway: https://github.com/xeronm/nft-torrent
 - Pets Memroal Web/Mini-App: https://github.com/noobel/pets-memorial-miniapp
