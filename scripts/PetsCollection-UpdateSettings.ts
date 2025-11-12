@@ -2,16 +2,34 @@ import { Address, toNano, Cell } from '@ton/core';
 import { PetsCollection, UpdateSettings } from '../wrappers/PetsCollection';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 
-const NewSettings: UpdateSettings = {
+const NewSettings_MainNet: UpdateSettings = {
     $$type: 'UpdateSettings',
     feeStorage: 0x3Cn, // 0.05 TON
-    feeClassA: 0x48n,  // 1 TON
-    feeClassB: 0x44n,  // 0.5 TON
+    feeClassA: 0x44n,  // 0.5 TON
+    feeClassB: 0x42n,  // 0.25 TON
     fbMode: 5n,
     fbUri: null,
+    minter: Address.parse('UQAvOkOhdbNpSdL4rzmEM8zWQZTKvyqIZmqbnh8pD7vtdkNa'),  // Mainnet
+}
+
+const NewSettings_TestNet: UpdateSettings = {
+    $$type: 'UpdateSettings',
+    feeStorage: 0x3Cn, // 0.05 TON
+    feeClassA: 0x44n,  // 0.5 TON
+    feeClassB: 0x42n,  // 0.25 TON
+    fbMode: 5n,
+    fbUri: 'https://s.muratovd.ru/c/',
     minter: Address.parse('0QBdDAYMeJLygjji1bFPRUY4yWP3_3JlNIllIG5SSNJEgCrH'),
 }
 
+const NewSettings = NewSettings_TestNet;
+
+
+function jsonbig (obj: any) {
+  return  JSON.stringify(obj, (_, v) =>
+    typeof v === "bigint" ? v.toString() : v
+  );
+}
 
 export async function run(provider: NetworkProvider, args: string[]) {
   const ui = provider.ui();
@@ -37,7 +55,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   let info2 = await petsCollection.getGetInfo();
   let attempt = 1;
-  while (JSON.stringify(info2) == JSON.stringify(info1)) {
+  while (jsonbig(info2) == jsonbig(info1)) {
     ui.setActionPrompt(`Attempt ${attempt}`);
     await sleep(3000);
     info2 = await petsCollection.getGetInfo();

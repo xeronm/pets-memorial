@@ -1,9 +1,14 @@
 Pets Memorial NFT Collection
 ============================
+![Pets Memorial banner](/assets/images/git-readme-banner.png "Pets Memorial")
 
-TON NFT Torrent HTTP Gateway: https://github.com/xeronm/nft-torrent
+Mainnet Website: https://petsmem.site/
 
-Feel free to support me with TON: UQDJJHWJKrt7ZKiRzXz2TpzJMxJ5RrWffTqXL8769EXa_2bh
+Linked repositories:
+- TON NFT Torrent HTTP Gateway: https://github.com/xeronm/nft-torrent
+- Pets Memroal Web/Mini-App: https://github.com/noobel/pets-memorial-miniapp
+
+Feel free to support us with TON: `UQDJJHWJKrt7ZKiRzXz2TpzJMxJ5RrWffTqXL8769EXa_2bh`
 
 ![Wallet UQDJJHWJKrt7ZKiRzXz2TpzJMxJ5RrWffTqXL8769EXa_2bh QR code](/assets/images/UQDJJHWJKrt7ZKiRzXz2TpzJMxJ5RrWffTqXL8769EXa_2bh.PNG "UQDJJHWJKrt7ZKiRzXz2TpzJMxJ5RrWffTqXL8769EXa_2bh")
 
@@ -14,8 +19,8 @@ Feel free to support me with TON: UQDJJHWJKrt7ZKiRzXz2TpzJMxJ5RrWffTqXL8769EXa_2
 Edit constants at `pets_collection.tact`
 
 ```ts
-const PetsCollectionName: String = "<Collection name>";
-const DefaultFallback: String = "<Collection content fallback URI apiPrefix>";
+const PetsCollectionName: String = "<Collection Name>";
+const DefaultFallback: String = "<Fallback URI>";
 ```
 
 #### Build and Test
