@@ -2,7 +2,11 @@ Pets Memorial NFT Collection
 ============================
 ![Pets Memorial banner](/assets/images/git-readme-banner.png "Pets Memorial")
 
+This repository contains contract sources for Pets Memorial NFT Collection on TON blockchain.
+
 Mainnet Website: https://petsmem.site/
+
+Mainnet Contract: [EQBSsYn6y560LVuVf3UYOnKUfH7Fexfk4iXtkA2TPl-CUsa6](https://tonviewer.com/EQBSsYn6y560LVuVf3UYOnKUfH7Fexfk4iXtkA2TPl-CUsa6)
 
 Linked repositories:
 - TON NFT Torrent HTTP Gateway: https://github.com/xeronm/nft-torrent
