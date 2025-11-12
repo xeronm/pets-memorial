@@ -7,7 +7,9 @@ export async function run(provider: NetworkProvider, args: string[]) {
 
   const address = Address.parse(args.length > 0 ? args[0] : await ui.input('PetsCollection address'));
   const amount = toNano(args.length > 1 ? args[1] : await ui.input('Withdraw amount'));
-  const isClassB = Boolean(args.length > 2 ? args[2] : await ui.input('Is Class B? [Y/N]'));
+  const isClassBstr = (args.length > 2 ? args[2] : await ui.input('Is Class B? [Y/N]'));
+
+  const isClassB = (isClassBstr == 'Y' || isClassBstr == 'y');
 
   if (!(await provider.isContractDeployed(address))) {
       ui.write(`Error: Contract at address ${address} is not deployed!`);
